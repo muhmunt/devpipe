@@ -10,7 +10,7 @@ import DraftSwitcher from '@/components/DraftSwitcher'
 import BuildStep from '@/components/BuildStep'
 import BriefChat from '@/components/BriefChat'
 import AcceptStep from '@/components/AcceptStep'
-import CardChatSidebar from '@/components/CardChatSidebar'
+import CardChatSidebar, { type ChatScope } from '@/components/CardChatSidebar'
 import StageActionBar from '@/components/StageActionBar'
 import { api } from '@/lib/api'
 import { STATUS_PILL } from '@/lib/statusMeta'
@@ -36,6 +36,14 @@ const STAGE_DESCRIPTION: Record<(typeof STAGES)[number], string> = {
   testing: 'Automated test pass against the worktree.',
   docs: 'Agent writes or updates documentation for whatever changed.',
   deployed: 'Merge into the real repo — nothing touches main until here.',
+}
+
+const CHAT_EMPTY_HINTS: Record<string, string> = {
+  prd: "Chat with the agent to draft this — describe what you want, it'll write the doc below.",
+  plan: 'e.g. "combine steps 2 and 3" or "add a step for tests".',
+  simulating:
+    'Describe the simulation — actor/login, endpoints, expected results… Run Simulate below uses whatever you land on here.',
+  general: 'Ask the agent anything about this card.',
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -111,6 +119,12 @@ export default function CardDetail() {
   const [card, setCard] = useState<Card | null>(null)
   const [openStage, setOpenStage] = useState<string>('')
   const [chatOpen, setChatOpen] = useState(false)
+  const [prdDraftContent, setPrdDraftContent] = useState('')
+  const [planRevisionTick, setPlanRevisionTick] = useState(0)
+  // Not read yet — Task 5 wires it into <PlanStep revisionTick={planRevisionTick} />
+  // so a chat-driven plan revision forces PlanStep to reload its task list.
+  // Referenced here so noUnusedLocals doesn't flag it before that call site exists.
+  void planRevisionTick
 
   const load = () => {
     if (!id) return
@@ -131,6 +145,11 @@ export default function CardDetail() {
 
   useEffect(load, [id])
 
+  useEffect(() => {
+    if (!card?.activePrdId) return
+    api.getPRD(card.id, card.activePrdId).then((prd) => setPrdDraftContent(prd.content))
+  }, [card?.activePrdId])
+
   if (!card)
     return (
       <AppShell>
@@ -139,6 +158,15 @@ export default function CardDetail() {
     )
 
   const currentIdx = STAGES.indexOf(card.stage as (typeof STAGES)[number])
+
+  const chatScope: ChatScope =
+    openStage === 'prd'
+      ? { stage: 'prd', docId: card.activePrdId, label: 'PRD draft', emptyHint: CHAT_EMPTY_HINTS.prd }
+      : openStage === 'plan'
+        ? { stage: 'plan', docId: card.activePlanId, label: 'Plan draft', emptyHint: CHAT_EMPTY_HINTS.plan }
+        : openStage === 'simulating'
+          ? { stage: 'simulating', docId: null, label: 'Simulate brief', emptyHint: CHAT_EMPTY_HINTS.simulating }
+          : { stage: 'general', docId: null, label: 'General', emptyHint: CHAT_EMPTY_HINTS.general }
 
   const advance = async (stage: (typeof STAGES)[number]) => {
     if (!id) return
@@ -278,7 +306,14 @@ export default function CardDetail() {
         </div>
 
         <div className="hidden lg:flex lg:w-[360px] lg:min-w-0 lg:shrink-0 lg:border-l lg:border-border lg:h-full">
-          <CardChatSidebar cardId={card.id} cardTitle={card.title} />
+          <CardChatSidebar
+            cardId={card.id}
+            cardTitle={card.title}
+            scope={chatScope}
+            prdContent={prdDraftContent}
+            onDocRevised={setPrdDraftContent}
+            onPlanRevised={() => setPlanRevisionTick((t) => t + 1)}
+          />
         </div>
       </div>
 
@@ -293,7 +328,14 @@ export default function CardDetail() {
       <Sheet open={chatOpen} onOpenChange={setChatOpen}>
         <SheetContent side="right" className="p-0 !w-full sm:!max-w-sm">
           <SheetTitle className="sr-only">Chat — {card.title}</SheetTitle>
-          <CardChatSidebar cardId={card.id} cardTitle={card.title} />
+          <CardChatSidebar
+            cardId={card.id}
+            cardTitle={card.title}
+            scope={chatScope}
+            prdContent={prdDraftContent}
+            onDocRevised={setPrdDraftContent}
+            onPlanRevised={() => setPlanRevisionTick((t) => t + 1)}
+          />
         </SheetContent>
       </Sheet>
     </AppShell>
