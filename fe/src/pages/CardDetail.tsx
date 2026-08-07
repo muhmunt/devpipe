@@ -8,7 +8,6 @@ import ChatStep from '@/components/ChatStep'
 import PlanStep from '@/components/PlanStep'
 import DraftSwitcher from '@/components/DraftSwitcher'
 import BuildStep from '@/components/BuildStep'
-import BriefChat from '@/components/BriefChat'
 import AcceptStep from '@/components/AcceptStep'
 import CardChatSidebar, { type ChatScope } from '@/components/CardChatSidebar'
 import StageActionBar from '@/components/StageActionBar'
@@ -264,24 +263,7 @@ export default function CardDetail() {
                           />
                         </>
                       )}
-                      {isOpen && stage === 'simulating' && (
-                        <div className="space-y-4">
-                          <BriefChat
-                            cardId={card.id}
-                            stage="simulating"
-                            placeholder="Describe the simulation — actor/login, endpoints, expected results…"
-                            emptyHint='Chat first to describe the scenario — e.g. "log in as the seeded test user, then GET /api/orders with that token, expect a 200 with a non-empty array." Run Simulate below uses whatever you land on here.'
-                          />
-                          <BuildStep
-                            cardId={card.id}
-                            stage={stage}
-                            stageLabel={STAGE_LABEL[stage]}
-                            planId={card.activePlanId}
-                            onAdvance={refreshCard}
-                          />
-                        </div>
-                      )}
-                      {isOpen && ['building', 'testing', 'docs'].includes(stage) && (
+                      {isOpen && ['building', 'simulating', 'testing', 'docs'].includes(stage) && (
                         <BuildStep
                           cardId={card.id}
                           stage={stage}
