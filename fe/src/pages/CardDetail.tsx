@@ -242,7 +242,8 @@ export default function CardDetail() {
                           <ChatStep
                             cardId={card.id}
                             prdId={card.activePrdId}
-                            stage="prd"
+                            content={prdDraftContent}
+                            onContentChange={setPrdDraftContent}
                             nextStage="plan"
                             continueLabel="Save & Continue to Plan"
                             onAdvance={load}
