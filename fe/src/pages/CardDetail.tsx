@@ -121,10 +121,6 @@ export default function CardDetail() {
   const [chatOpen, setChatOpen] = useState(false)
   const [prdDraftContent, setPrdDraftContent] = useState('')
   const [planRevisionTick, setPlanRevisionTick] = useState(0)
-  // Not read yet — Task 5 wires it into <PlanStep revisionTick={planRevisionTick} />
-  // so a chat-driven plan revision forces PlanStep to reload its task list.
-  // Referenced here so noUnusedLocals doesn't flag it before that call site exists.
-  void planRevisionTick
 
   // Stable identities so CardChatSidebar's SSE useEffect (which depends on
   // these callbacks) doesn't tear down and reopen the EventSource on every
@@ -263,6 +259,7 @@ export default function CardDetail() {
                             cardId={card.id}
                             prdId={card.activePrdId}
                             planId={card.activePlanId}
+                            revisionTick={planRevisionTick}
                             onAdvance={load}
                           />
                         </>

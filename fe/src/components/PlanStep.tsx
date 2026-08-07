@@ -1,49 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronUp, Plus, RefreshCw, Send, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, ChevronDown, ChevronUp, Plus, RefreshCw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import StageActionBar from '@/components/StageActionBar'
 import { api } from '@/lib/api'
-import type { ChatMessage, PlanWithTasks, StreamEvent, Task } from '@/lib/types'
-
-const THINKING_PHRASES = ['Reading the plan…', 'Thinking this through…', 'Revising…', 'Still working on it…']
-
-function ThinkingDots() {
-  return (
-    <span className="inline-flex gap-0.5 ml-1 align-middle">
-      <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
-      <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
-      <span className="w-1 h-1 rounded-full bg-current animate-bounce" />
-    </span>
-  )
-}
-
-function tasksToNumberedList(tasks: Task[]) {
-  return [...tasks]
-    .sort((a, b) => a.order - b.order)
-    .map((t, i) => `${i + 1}. ${t.title}`)
-    .join('\n')
-}
+import type { PlanWithTasks, StreamEvent, Task } from '@/lib/types'
 
 export default function PlanStep({
   cardId,
   prdId,
   planId,
+  revisionTick,
   onAdvance,
 }: {
   cardId: string
   prdId: string
   planId: string | null
+  revisionTick: number
   onAdvance: () => void
 }) {
   const [data, setData] = useState<PlanWithTasks | null>(null)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [bootstrapping, setBootstrapping] = useState(false)
   const [bootstrapText, setBootstrapText] = useState('')
-  const [streaming, setStreaming] = useState<string | null>(null)
-  const [input, setInput] = useState('')
   const [newTitle, setNewTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [phraseIdx, setPhraseIdx] = useState(0)
-  const transcriptRef = useRef<HTMLDivElement>(null)
 
   const load = async () => {
     if (!planId) {
@@ -52,13 +31,13 @@ export default function PlanStep({
     }
     const d = await api.getPlan(cardId, planId)
     setData(d)
-    const history = await api.listChat(cardId, 'plan', planId)
-    setMessages(history)
   }
 
+  // revisionTick bumps whenever the sidebar chat completes a plan
+  // revision — this re-fetches the (now server-side-revised) task list.
   useEffect(() => {
     load()
-  }, [cardId, planId])
+  }, [cardId, planId, revisionTick])
 
   useEffect(() => {
     const es = new EventSource(api.streamUrl(cardId))
@@ -72,34 +51,13 @@ export default function PlanStep({
       } else if (ev.type === 'done') {
         setBootstrapping(false)
         load()
-      } else if (ev.type === 'chat_delta' && ev.line != null) {
-        setStreaming((prev) => (prev == null ? ev.line! : prev + ev.line))
-      } else if (ev.type === 'chat' && ev.line != null) {
-        setStreaming((prev) => (prev == null ? ev.line! : prev + '\n' + ev.line))
-      } else if (ev.type === 'chat_done') {
-        setStreaming(null)
-        load()
       } else if (ev.type === 'error') {
         setBootstrapping(false)
-        setStreaming(null)
         setError(ev.data ?? 'agent failed')
       }
     }
     return () => es.close()
   }, [cardId])
-
-  useEffect(() => {
-    transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight })
-  }, [messages, streaming])
-
-  useEffect(() => {
-    if (streaming == null) {
-      setPhraseIdx(0)
-      return
-    }
-    const id = setInterval(() => setPhraseIdx((i) => Math.min(i + 1, THINKING_PHRASES.length - 1)), 4000)
-    return () => clearInterval(id)
-  }, [streaming === null])
 
   const bootstrap = async () => {
     setError(null)
@@ -114,19 +72,6 @@ export default function PlanStep({
     } finally {
       setBootstrapping(false)
     }
-  }
-
-  const send = async () => {
-    if (!input.trim() || !data || !planId) return
-    setError(null)
-    setMessages((prev) => [
-      ...prev,
-      { id: `local-${Date.now()}`, cardId, stage: 'plan', docId: planId, role: 'user', content: input, createdAt: '' },
-    ])
-    setStreaming('')
-    const message = input
-    setInput('')
-    await api.sendChat(cardId, 'plan', message, tasksToNumberedList(data.tasks), planId)
   }
 
   const renameTask = async (task: Task, title: string) => {
@@ -186,64 +131,10 @@ export default function PlanStep({
   if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>
 
   const tasks = [...data.tasks].sort((a, b) => a.order - b.order)
-  const loading = streaming !== null
 
   return (
     <div className="space-y-8">
-      <div className="space-y-3">
-        <div ref={transcriptRef} className="bg-card border border-border rounded-lg p-4 min-h-[120px] max-h-56 overflow-y-auto space-y-2">
-          <p className="text-xs text-muted-foreground italic mb-2">Comment here to revise the plan</p>
-          {messages.length === 0 && !loading && (
-            <p className="text-sm text-muted-foreground">
-              e.g. "combine steps 2 and 3" or "add a step for tests".
-            </p>
-          )}
-          <div className="flex flex-col gap-2">
-            {messages.map((m) =>
-              m.role === 'user' ? (
-                <div key={m.id} className="self-end max-w-[90%] bg-secondary border border-border px-3 py-2 rounded-lg text-sm whitespace-pre-wrap">
-                  {m.content}
-                </div>
-              ) : (
-                <div key={m.id} className="max-w-[90%] bg-primary/10 border border-primary/10 p-3 rounded-lg text-sm whitespace-pre-wrap">
-                  {m.content}
-                </div>
-              ),
-            )}
-            {loading && (
-              <div className="max-w-[90%] bg-primary/10 border border-primary/10 p-3 rounded-lg text-sm text-muted-foreground">
-                {streaming || (
-                  <>
-                    {THINKING_PHRASES[phraseIdx]}
-                    <ThinkingDots />
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
-
-        <div className="flex gap-2">
-          <input
-            className="flex-1 bg-secondary border border-border rounded-md px-4 py-2.5 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-colors duration-(--dur-short) ease-(--ease-out)"
-            placeholder="Comment to revise the plan…"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !loading && send()}
-            disabled={loading}
-          />
-          <button
-            type="button"
-            onClick={send}
-            disabled={loading || !input.trim()}
-            className="bg-primary text-primary-foreground p-2.5 rounded-md hover:opacity-90 disabled:opacity-40 transition-opacity"
-          >
-            <Send className="size-4" />
-          </button>
-        </div>
-      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-border pb-2">
@@ -300,24 +191,16 @@ export default function PlanStep({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 pt-4 border-t border-border/30">
+      <div className="space-y-3 pt-4 border-t border-border/30">
+        <StageActionBar turn="you" label="Approve Plan" onClick={approve} disabled={tasks.length === 0} icon={Check} />
         <button
           type="button"
           onClick={bootstrap}
-          disabled={bootstrapping || loading}
-          className="flex-1 px-4 py-2.5 border border-border text-foreground text-sm font-medium rounded hover:bg-secondary transition-colors flex items-center justify-center gap-2 disabled:opacity-40"
+          disabled={bootstrapping}
+          className="w-full px-4 py-2.5 border border-border text-foreground text-sm font-medium rounded hover:bg-secondary transition-colors flex items-center justify-center gap-2 disabled:opacity-40"
         >
           <RefreshCw className="size-3.5" />
           {bootstrapping ? 'Regenerating…' : 'Regenerate from PRD'}
-        </button>
-        <button
-          type="button"
-          onClick={approve}
-          disabled={tasks.length === 0}
-          className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-bold rounded hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-40"
-        >
-          <Check className="size-3.5" />
-          Approve Plan
         </button>
       </div>
     </div>
