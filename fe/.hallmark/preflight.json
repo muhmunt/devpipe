@@ -1,0 +1,10 @@
+{
+  "scanned": "2026-07-28",
+  "fontStack": "Geist Variable (@fontsource-variable/geist, package.json L13)",
+  "palette": "OKLCH/hex custom properties in :root/.dark (src/index.css L53-141)",
+  "motion": "none installed — no framer-motion/gsap/motion/lenis in package.json deps",
+  "spacing": "Tailwind v4 default scale, no custom --space-* system",
+  "framework": "Vite + React 19 + react-router-dom 7, Tailwind v4 via @tailwindcss/vite (no tailwind.config.* — tokens live in @theme inline, src/index.css L9-51)",
+  "componentLib": "shadcn/ui (radix-ui primitives) in src/components/ui/",
+  "existingHallmarkRuns": "src/pages/Board.tsx (Bento Grid, single-page) + site-wide hygiene pass — see .hallmark/log.json"
+}

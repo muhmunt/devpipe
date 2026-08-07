@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>devpipe - 08 Deploy</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Public+Sans:wght@300..700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Public+Sans:wght@100..900&display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .filled-icon {
+            font-variation-settings: 'FILL' 1;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d0e12;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #23262d;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #454850;
+        }
+        body {
+            background-color: #0d0e12;
+            color: #e3e5f0;
+            font-family: 'Geist', sans-serif;
+        }
+        .mono {
+            font-family: 'Geist Mono', monospace;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container-highest": "#23262d",
+                      "on-tertiary-fixed": "#413057",
+                      "on-primary-fixed": "#283858",
+                      "inverse-surface": "#faf9fe",
+                      "tertiary-fixed-dim": "#d6c0f0",
+                      "tertiary": "#efdfff",
+                      "inverse-primary": "#4f5f81",
+                      "on-primary-container": "#d9e3ff",
+                      "on-error-container": "#ff9993",
+                      "surface-container-lowest": "#000000",
+                      "secondary-dim": "#b1b8ce",
+                      "inverse-on-surface": "#545559",
+                      "on-secondary": "#384052",
+                      "on-surface-variant": "#a9abb5",
+                      "secondary-container": "#343b4d",
+                      "on-background": "#e3e5f0",
+                      "error-dim": "#c54d4a",
+                      "on-primary": "#304060",
+                      "outline-variant": "#454850",
+                      "error-container": "#871f21",
+                      "on-tertiary": "#5d4c74",
+                      "on-tertiary-fixed-variant": "#5e4c75",
+                      "primary-container": "#435274",
+                      "tertiary-container": "#e4ceff",
+                      "surface-tint": "#b6c6ee",
+                      "outline": "#73757e",
+                      "primary-fixed-dim": "#b9c9f0",
+                      "on-primary-fixed-variant": "#455476",
+                      "surface": "#0d0e12",
+                      "primary": "#b6c6ee",
+                      "primary-dim": "#a9b9df",
+                      "surface-bright": "#292c34",
+                      "on-secondary-fixed-variant": "#545b6e",
+                      "on-secondary-fixed": "#383f51",
+                      "background": "#0d0e12",
+                      "surface-container": "#17191f",
+                      "tertiary-dim": "#d6c0f0",
+                      "on-tertiary-container": "#54436b",
+                      "secondary": "#bfc6dc",
+                      "error": "#fa746f",
+                      "on-surface": "#e3e5f0",
+                      "secondary-fixed": "#dbe2f9",
+                      "surface-variant": "#23262d",
+                      "surface-dim": "#0d0e12",
+                      "tertiary-fixed": "#e4ceff",
+                      "surface-container-low": "#111318",
+                      "surface-container-high": "#1d1f26",
+                      "secondary-fixed-dim": "#cdd4eb",
+                      "on-secondary-container": "#b8bfd5",
+                      "on-error": "#490006",
+                      "primary-fixed": "#c7d7ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "fontFamily": {
+                      "headline": ["Geist"],
+                      "display": ["Geist"],
+                      "body": ["Geist"],
+                      "label": ["Public Sans"]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="antialiased selection:bg-primary selection:text-on-primary">
+<!-- Top Navigation Anchor -->
+<header class="bg-surface sticky top-0 z-50 flex justify-between items-center w-full px-4 h-14 border-b border-outline-variant font-body text-body-medium font-medium">
+<div class="flex items-center gap-2 cursor-pointer hover:bg-surface-variant transition-colors px-2 py-1 rounded">
+<span class="material-symbols-outlined text-on-surface-variant">arrow_back</span>
+<span class="text-on-surface-variant text-sm">Back to Board</span>
+</div>
+<div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">terminal</span>
+<span class="text-xl font-headline font-black tracking-tighter text-on-surface">devpipe</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 text-on-surface-variant hover:text-primary cursor-pointer transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</div>
+</div>
+</header>
+<main class="max-w-[720px] mx-auto px-6 py-12">
+<!-- Header Info Section -->
+<section class="mb-12">
+<div class="flex items-center justify-between mb-4">
+<h1 class="text-3xl font-headline font-bold tracking-tight text-on-surface">Add rate limiting to API</h1>
+<div class="bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full text-xs font-bold tracking-widest flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                    SUCCESS
+                </div>
+</div>
+<div class="flex items-center gap-3 text-on-surface-variant font-mono text-sm">
+<span class="opacity-50">~/code/api-service</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px]">memory</span>
+                    agent: claude
+                </span>
+</div>
+</section>
+<!-- Stepper Component -->
+<div class="space-y-0 relative">
+<!-- Vertical Line -->
+<div class="absolute left-[13px] top-4 bottom-4 w-px bg-outline-variant"></div>
+<!-- Completed Stages (01-07) -->
+<div class="space-y-4">
+<!-- Stage 01 -->
+<div class="flex gap-4 group cursor-pointer">
+<div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-surface-container border border-outline-variant text-primary transition-all">
+<span class="material-symbols-outlined text-lg font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="text-sm font-mono text-on-surface-variant uppercase tracking-wider group-hover:text-primary transition-colors">01 PRD</span>
+</div>
+</div>
+<!-- Stage 02 -->
+<div class="flex gap-4 group cursor-pointer">
+<div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-surface-container border border-outline-variant text-primary transition-all">
+<span class="material-symbols-outlined text-lg font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="text-sm font-mono text-on-surface-variant uppercase tracking-wider group-hover:text-primary transition-colors">02 Plan</span>
+</div>
+</div>
+<!-- Stage 03 -->
+<div class="flex gap-4 group cursor-pointer">
+<div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-surface-container border border-outline-variant text-primary transition-all">
+<span class="material-symbols-outlined text-lg font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="text-sm font-mono text-on-surface-variant uppercase tracking-wider group-hover:text-primary transition-colors">03 Approved</span>
+</div>
+</div>
+<!-- Stage 04 -->
+<div class="flex gap-4 group cursor-pointer">
+<div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-surface-container border border-outline-variant text-primary transition-all">
+<span class="material-symbols-outlined text-lg font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="text-sm font-mono text-on-surface-variant uppercase tracking-wider group-hover:text-primary transition-colors">04 Build</span>
+</div>
+</div>
+<!-- Stage 05 -->
+<div class="flex gap-4 group cursor-pointer">
+<div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-surface-container border border-outline-variant text-primary transition-all">
+<span class="material-symbols-outlined text-lg font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="text-sm font-mono text-on-surface-variant uppercase tracking-wider group-hover:text-primary transition-colors">05 Simulate</span>
+</div>
+</div>
+<!-- Stage 06 -->
+<div class="flex gap-4 group cursor-pointer">
+<div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-surface-container border border-outline-variant text-primary transition-all">
+<span class="material-symbols-outlined text-lg font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="text-sm font-mono text-on-surface-variant uppercase tracking-wider group-hover:text-primary transition-colors">06 Test</span>
+</div>
+</div>
+<!-- Stage 07 -->
+<div class="flex gap-4 group cursor-pointer">
+<div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-surface-container border border-outline-variant text-primary transition-all">
+<span class="material-symbols-outlined text-lg font-bold">check</span>
+</div>
+<div class="flex flex-col pt-0.5">
+<span class="text-sm font-mono text-on-surface-variant uppercase tracking-wider group-hover:text-primary transition-colors">07 Docs</span>
+</div>
+</div>
+<!-- Active Stage: 08 DEPLOY -->
+<div class="flex gap-4 items-start">
+<div class="relative z-10 flex items-center justify-center w-7 h-7 rounded-full bg-primary shadow-[0_0_15px_rgba(182,198,238,0.3)]">
+<span class="material-symbols-outlined text-on-primary text-lg filled-icon" style="font-variation-settings: 'FILL' 1;">rocket_launch</span>
+</div>
+<div class="flex-1">
+<div class="flex flex-col mb-4">
+<span class="text-sm font-mono text-primary font-bold uppercase tracking-wider">08 DEPLOY</span>
+</div>
+<!-- Expanded Panel Content -->
+<div class="bg-surface-container border border-outline-variant rounded-lg p-6 shadow-xl">
+<p class="text-on-surface-variant text-sm leading-relaxed mb-6">
+                                Merges the card branch from the isolated worktree into the real repo. Nothing has touched the real repo until this step.
+                            </p>
+<div class="space-y-6">
+<div>
+<label class="block text-[10px] font-mono text-on-surface-variant uppercase tracking-[0.2em] mb-2">Branch Name</label>
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant text-on-surface font-mono text-sm px-4 py-3 rounded focus:outline-none focus:border-primary transition-colors" readonly="" type="text" value="feat/add-rate-limiting-to-api"/>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 opacity-40 hover:opacity-100 cursor-pointer transition-opacity">
+<span class="material-symbols-outlined text-sm">content_copy</span>
+</div>
+</div>
+</div>
+<button class="w-full bg-primary hover:bg-primary-dim text-on-primary font-bold py-3 px-6 rounded transition-all active:scale-[0.99] flex items-center justify-center gap-2 shadow-lg shadow-primary/10">
+<span class="material-symbols-outlined text-[20px]">merge</span>
+                                    Accept and Merge
+                                </button>
+<div class="space-y-2">
+<label class="block text-[10px] font-mono text-on-surface-variant uppercase tracking-[0.2em]">Deployment Log</label>
+<div class="bg-surface-container-lowest border border-outline-variant rounded p-4 font-mono text-[13px] leading-6 overflow-hidden">
+<div class="flex gap-3">
+<span class="text-primary/50">$</span>
+<span class="text-on-surface">git checkout main</span>
+</div>
+<div class="text-on-surface-variant/80">Switched to branch 'feat/add-rate-limiting-to-api'</div>
+<div class="text-on-surface-variant/80">Merge made by the "ort" strategy.</div>
+<div class="flex items-center gap-2 mt-1">
+<span class="text-primary">3 files changed, 142 insertions(+), 4 deletions(-)</span>
+</div>
+<div class="text-on-surface flex items-center gap-2 mt-2">
+<span class="material-symbols-outlined text-primary text-[16px]">done_all</span>
+                                            Fast-forwarded main to feat/add-rate-limiting-to-api
+                                        </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Subtle atmospheric micro-interaction script -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.querySelector('main');
+            container.style.opacity = '0';
+            container.style.transform = 'translateY(10px)';
+            
+            setTimeout(() => {
+                container.style.transition = 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }, 100);
+
+            // Add hover effects for the stages
+            const stages = document.querySelectorAll('.group');
+            stages.forEach(stage => {
+                stage.addEventListener('mouseenter', () => {
+                    const icon = stage.querySelector('.w-7');
+                    if (icon && !icon.classList.contains('bg-primary')) {
+                        icon.style.borderColor = 'var(--tw-colors-primary)';
+                        icon.style.boxShadow = '0 0 8px rgba(182, 198, 238, 0.2)';
+                    }
+                });
+                stage.addEventListener('mouseleave', () => {
+                    const icon = stage.querySelector('.w-7');
+                    if (icon && !icon.classList.contains('bg-primary')) {
+                        icon.style.borderColor = '';
+                        icon.style.boxShadow = '';
+                    }
+                });
+            });
+        });
+    </script>
+</body></html>

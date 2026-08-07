@@ -1,0 +1,16 @@
+# Local Claude Code settings — personal, not shared
+.claude/settings.local.json
+
+# Devpipe's own runtime data: per-card git worktrees created while testing
+# the pipeline against a scratch repo — not source, not meant to be tracked.
+be/ajari/
+
+# Go build artifacts (none currently, ignored preemptively)
+be/bin/
+be/api
+be/*.exe
+
+# OS / editor cruft at the repo root (fe/ has its own .gitignore for its
+# own node_modules/dist/etc.)
+.DS_Store
+*.local

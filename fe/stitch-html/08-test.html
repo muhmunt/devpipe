@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>devpipe - Migrate DB to pgx v5</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.cdnfonts.com/css/geist" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;700&display=swap');
+        
+        body {
+            font-family: 'Geist', sans-serif;
+            background-color: #0d0e12;
+            color: #e3e5f0;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 20px;
+        }
+
+        .terminal-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .terminal-scroll::-webkit-scrollbar-track {
+            background: #111318;
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb {
+            background: #23262d;
+            border-radius: 4px;
+        }
+
+        .accordion-item:not(.active) .accordion-content {
+            display: none;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#383f51",
+                        "error": "#fa746f",
+                        "on-tertiary-container": "#54436b",
+                        "on-primary-fixed": "#283858",
+                        "on-background": "#e3e5f0",
+                        "secondary-fixed": "#dbe2f9",
+                        "secondary": "#bfc6dc",
+                        "surface-tint": "#b6c6ee",
+                        "surface-container-highest": "#23262d",
+                        "primary": "#b6c6ee",
+                        "surface": "#0d0e12",
+                        "on-primary-container": "#d9e3ff",
+                        "inverse-on-surface": "#545559",
+                        "on-tertiary": "#5d4c74",
+                        "primary-container": "#435274",
+                        "outline": "#73757e",
+                        "surface-variant": "#23262d",
+                        "inverse-surface": "#faf9fe",
+                        "on-error-container": "#ff9993",
+                        "secondary-fixed-dim": "#cdd4eb",
+                        "secondary-container": "#343b4d",
+                        "background": "#0d0e12",
+                        "on-tertiary-fixed-variant": "#5e4c75",
+                        "on-secondary-container": "#b8bfd5",
+                        "secondary-dim": "#b1b8ce",
+                        "tertiary": "#efdfff",
+                        "on-secondary": "#384052",
+                        "outline-variant": "#454850",
+                        "tertiary-dim": "#d6c0f0",
+                        "tertiary-fixed": "#e4ceff",
+                        "on-primary-fixed-variant": "#455476",
+                        "primary-fixed-dim": "#b9c9f0",
+                        "surface-container-lowest": "#000000",
+                        "surface-container-low": "#111318",
+                        "surface-bright": "#292c34",
+                        "tertiary-container": "#e4ceff",
+                        "inverse-primary": "#4f5f81",
+                        "on-surface-variant": "#a9abb5",
+                        "surface-container-high": "#1d1f26",
+                        "primary-dim": "#a9b9df",
+                        "surface-container": "#17191f",
+                        "error-dim": "#c54d4a",
+                        "on-tertiary-fixed": "#413057",
+                        "tertiary-fixed-dim": "#d6c0f0",
+                        "on-error": "#490006",
+                        "surface-dim": "#0d0e12",
+                        "on-secondary-fixed-variant": "#545b6e",
+                        "error-container": "#871f21",
+                        "on-surface": "#e3e5f0",
+                        "primary-fixed": "#c7d7ff",
+                        "on-primary": "#304060"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Geist"],
+                        "display": ["Geist"],
+                        "body": ["Geist"],
+                        "label": ["Public Sans"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface flex min-h-screen overflow-hidden">
+<!-- Sidebar (NavigationDrawer) -->
+<aside class="flex flex-col h-full py-4 bg-surface-container border-r border-outline-variant w-64 hidden md:flex shrink-0">
+<div class="px-6 mb-8">
+<h2 class="text-lg font-headline font-bold text-on-surface uppercase tracking-wider">DEVPIPE_ROOT</h2>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-6 py-3 bg-secondary-container text-on-secondary-container border-l-4 border-primary font-body text-sm uppercase tracking-wider cursor-pointer duration-150" href="#">
+<span class="material-symbols-outlined mr-3">account_tree</span>
+<span>Pipeline</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-variant font-body text-sm uppercase tracking-wider cursor-pointer duration-150" href="#">
+<span class="material-symbols-outlined mr-3">memory</span>
+<span>Agents</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-variant font-body text-sm uppercase tracking-wider cursor-pointer duration-150" href="#">
+<span class="material-symbols-outlined mr-3">terminal</span>
+<span>Logs</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-variant font-body text-sm uppercase tracking-wider cursor-pointer duration-150" href="#">
+<span class="material-symbols-outlined mr-3">biotech</span>
+<span>Simulate</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-variant font-body text-sm uppercase tracking-wider cursor-pointer duration-150" href="#">
+<span class="material-symbols-outlined mr-3">description</span>
+<span>Docs</span>
+</a>
+<a class="flex items-center px-6 py-3 text-on-surface-variant hover:bg-surface-variant font-body text-sm uppercase tracking-wider cursor-pointer duration-150" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col h-screen overflow-hidden">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-4 h-14 bg-surface text-primary border-b border-outline-variant sticky top-0 z-50">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary cursor-pointer active:opacity-80">terminal</span>
+<h1 class="text-xl font-headline font-black tracking-tighter text-on-surface">devpipe</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center gap-2 px-3 py-1 bg-surface-container-highest rounded border border-outline-variant text-[10px] font-mono text-on-surface-variant">
+<span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+<span>1 STAGE FAILED</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant hover:bg-surface-variant transition-colors p-2 rounded-full cursor-pointer active:opacity-80">settings</span>
+</div>
+</header>
+<!-- Scrollable Content Canvas -->
+<div class="flex-1 overflow-y-auto bg-background terminal-scroll">
+<div class="max-w-[720px] mx-auto px-6 py-12">
+<!-- Back Link -->
+<a class="inline-flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors text-sm mb-6 group" href="#">
+<span class="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span>
+                    Back to Board
+                </a>
+<!-- Header Information -->
+<div class="mb-10">
+<div class="flex items-start justify-between gap-4 mb-2">
+<h2 class="text-3xl font-headline font-bold text-on-surface tracking-tight">Migrate DB to pgx v5</h2>
+<span class="bg-error/10 text-error border border-error/20 px-2 py-1 rounded text-[10px] font-black tracking-widest uppercase">FAILED</span>
+</div>
+<div class="flex items-center gap-3 text-on-surface-variant text-sm font-mono opacity-80">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">folder</span>
+                            ~/code/db-infra
+                        </span>
+<span class="w-1 h-1 bg-outline-variant rounded-full"></span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">smart_toy</span>
+                            agent: claude
+                        </span>
+</div>
+</div>
+<!-- Stage Stepper (Accordion) -->
+<div class="space-y-4">
+<!-- Done Stages (Collapsed) -->
+<div class="space-y-2">
+<!-- Stage 01 -->
+<div class="flex items-center gap-4 p-4 border border-outline-variant bg-surface-container-low rounded-lg opacity-60">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined !text-base" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<div class="flex-1">
+<span class="text-xs font-mono text-on-surface-variant">01</span>
+<p class="text-sm font-medium">PRD</p>
+</div>
+</div>
+<!-- Stage 02 -->
+<div class="flex items-center gap-4 p-4 border border-outline-variant bg-surface-container-low rounded-lg opacity-60">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined !text-base" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<div class="flex-1">
+<span class="text-xs font-mono text-on-surface-variant">02</span>
+<p class="text-sm font-medium">Plan</p>
+</div>
+</div>
+<!-- Stage 03 -->
+<div class="flex items-center gap-4 p-4 border border-outline-variant bg-surface-container-low rounded-lg opacity-60">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined !text-base" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<div class="flex-1">
+<span class="text-xs font-mono text-on-surface-variant">03</span>
+<p class="text-sm font-medium">Approved</p>
+</div>
+</div>
+<!-- Stage 04 -->
+<div class="flex items-center gap-4 p-4 border border-outline-variant bg-surface-container-low rounded-lg opacity-60">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined !text-base" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<div class="flex-1">
+<span class="text-xs font-mono text-on-surface-variant">04</span>
+<p class="text-sm font-medium">Build</p>
+</div>
+</div>
+<!-- Stage 05 -->
+<div class="flex items-center gap-4 p-4 border border-outline-variant bg-surface-container-low rounded-lg opacity-60">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined !text-base" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<div class="flex-1">
+<span class="text-xs font-mono text-on-surface-variant">05</span>
+<p class="text-sm font-medium">Simulate</p>
+</div>
+</div>
+</div>
+<!-- Active/Failed Stage (Expanded) -->
+<div class="border-2 border-error bg-surface-container rounded-lg shadow-2xl overflow-hidden active">
+<div class="flex items-center gap-4 p-4 border-b border-outline-variant">
+<div class="w-8 h-8 rounded-full bg-error/20 flex items-center justify-center text-error border border-error">
+<span class="material-symbols-outlined !text-base">close</span>
+</div>
+<div class="flex-1">
+<span class="text-xs font-mono text-error font-bold">06</span>
+<p class="text-base font-bold">Test</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">keyboard_arrow_up</span>
+</div>
+<div class="p-6">
+<!-- Actions Row -->
+<div class="flex flex-wrap items-center gap-3 mb-6">
+<button class="px-4 py-2 bg-primary text-on-primary rounded font-bold text-sm flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined !text-sm">play_arrow</span>
+                                    Run Test
+                                </button>
+<button class="px-4 py-2 border border-outline-variant bg-transparent text-on-surface rounded font-medium text-sm flex items-center gap-2 hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined !text-sm">visibility</span>
+                                    View changes (5)
+                                </button>
+<button class="px-4 py-2 bg-secondary-container text-on-secondary-container rounded font-bold text-sm flex items-center gap-2 ml-auto hover:bg-secondary-fixed-dim transition-all">
+                                    Continue Build
+                                </button>
+</div>
+<!-- Error Notice -->
+<div class="flex items-start gap-3 p-4 bg-error-container/20 border border-error/20 rounded mb-6">
+<span class="material-symbols-outlined text-error !text-lg mt-0.5">error</span>
+<p class="text-sm text-error leading-relaxed">
+                                    Interrupted before finishing <span class="font-bold underline decoration-error/40">Run integration test suite</span>. Click Continue Build to resume.
+                                </p>
+</div>
+<!-- Terminal Panel -->
+<div class="bg-black rounded-lg border border-outline-variant overflow-hidden">
+<div class="flex items-center justify-between px-3 py-2 bg-surface-container-highest/50 border-b border-outline-variant">
+<div class="flex gap-1.5">
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant"></div>
+</div>
+<span class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest">shell — zsh</span>
+</div>
+<div class="p-4 font-mono text-xs space-y-1.5 h-64 overflow-y-auto terminal-scroll leading-relaxed">
+<p class="text-on-surface-variant opacity-60"># System initialized. Starting test environment...</p>
+<p class="text-on-tertiary-fixed">
+<span class="text-primary-dim">➜</span>
+<span class="text-secondary">docker-compose</span> up -d postgres redis
+                                    </p>
+<p class="text-[#4ade80]">✔ Container db-infra-postgres-1  Started</p>
+<p class="text-[#4ade80]">✔ Container db-infra-redis-1  Started</p>
+<p class="text-on-surface-variant">Waiting for healthy state... (0.4s)</p>
+<p class="text-on-tertiary-fixed">
+<span class="text-primary-dim">➜</span>
+<span class="text-secondary">go test ./...</span>
+</p>
+<p class="text-on-surface">running go test ./...</p>
+<p class="text-on-surface">internal/db: 38 passed, 2 failed</p>
+<p class="text-error font-bold">FAIL TestPoolReconnect (0.42s)</p>
+<p class="text-on-surface-variant pl-4">--- FAIL: TestPoolReconnect (0.42s)</p>
+<p class="text-on-surface-variant pl-4">    pool_test.go:124: expected pgx.ConnConfig mismatch: v5 pool opts invalid</p>
+<p class="text-error font-bold">FAIL TestMigrationRollback (0.11s)</p>
+<p class="text-on-surface-variant pl-4">--- FAIL: TestMigrationRollback (0.11s)</p>
+<p class="text-on-surface-variant pl-4">    migrate_test.go:88: table "users" already exists after rollback</p>
+<div class="flex items-center gap-2 mt-2 animate-pulse">
+<span class="w-1.5 h-4 bg-error"></span>
+<span class="text-error font-bold italic">Terminated with exit code 1</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Locked Stages -->
+<div class="space-y-2 opacity-40 grayscale pointer-events-none">
+<!-- Stage 07 -->
+<div class="flex items-center gap-4 p-4 border border-outline-variant bg-surface-container-low rounded-lg">
+<div class="w-8 h-8 rounded-full bg-outline-variant/20 flex items-center justify-center text-outline">
+<span class="material-symbols-outlined !text-base">lock</span>
+</div>
+<div class="flex-1">
+<span class="text-xs font-mono text-on-surface-variant">07</span>
+<p class="text-sm font-medium">Docs</p>
+</div>
+</div>
+<!-- Stage 08 -->
+<div class="flex items-center gap-4 p-4 border border-outline-variant bg-surface-container-low rounded-lg">
+<div class="w-8 h-8 rounded-full bg-outline-variant/20 flex items-center justify-center text-outline">
+<span class="material-symbols-outlined !text-base">lock</span>
+</div>
+<div class="flex-1">
+<span class="text-xs font-mono text-on-surface-variant">08</span>
+<p class="text-sm font-medium">Deploy</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Technical Footer/Metadata -->
+<div class="mt-16 pt-8 border-t border-outline-variant/30 grid grid-cols-3 gap-8">
+<div>
+<p class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest mb-1">Hash</p>
+<p class="text-xs font-mono text-on-surface">f729a1b...2e</p>
+</div>
+<div>
+<p class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest mb-1">Duration</p>
+<p class="text-xs font-mono text-on-surface">1h 12m 44s</p>
+</div>
+<div>
+<p class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest mb-1">Artifacts</p>
+<p class="text-xs font-mono text-on-surface">3 binaries, 1 report</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating UI elements for atmospheric tech feel -->
+<div class="fixed bottom-8 right-8 flex flex-col gap-2">
+<div class="bg-surface-container-highest border border-outline-variant px-3 py-1.5 rounded-full flex items-center gap-3 shadow-xl">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="text-[10px] font-mono font-bold">AGENT_HALTED</span>
+</div>
+</div>
+<script>
+        // Simple micro-interaction for the terminal scroll
+        const terminal = document.querySelector('.terminal-scroll');
+        if (terminal) {
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        // Accordion logic (visual only for this static prompt, but wired for feel)
+        document.querySelectorAll('.accordion-item').forEach(item => {
+            item.addEventListener('click', () => {
+                // In a real app, this would toggle state
+                console.log('Toggle stage details');
+            });
+        });
+    </script>
+</body></html>

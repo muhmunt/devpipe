@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>devpipe | Onboarding</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&amp;family=Geist:wght@100;300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "on-tertiary-fixed": "#413057",
+                "secondary-dim": "#b1b8ce",
+                "tertiary-fixed": "#e4ceff",
+                "primary": "#b6c6ee",
+                "primary-fixed": "#c7d7ff",
+                "on-primary": "#304060",
+                "primary-fixed-dim": "#b9c9f0",
+                "error": "#fa746f",
+                "background": "#0d0e12",
+                "inverse-primary": "#4f5f81",
+                "on-primary-fixed": "#283858",
+                "error-dim": "#c54d4a",
+                "surface-container-low": "#111318",
+                "on-surface": "#e3e5f0",
+                "outline-variant": "#454850",
+                "tertiary-dim": "#d6c0f0",
+                "on-primary-container": "#d9e3ff",
+                "surface-tint": "#b6c6ee",
+                "secondary-fixed": "#dbe2f9",
+                "on-secondary": "#384052",
+                "surface-container-lowest": "#000000",
+                "surface-container-high": "#1d1f26",
+                "on-error": "#490006",
+                "on-tertiary": "#5d4c74",
+                "surface-dim": "#0d0e12",
+                "on-secondary-fixed": "#383f51",
+                "secondary-container": "#343b4d",
+                "tertiary": "#efdfff",
+                "surface": "#0d0e12",
+                "error-container": "#871f21",
+                "secondary-fixed-dim": "#cdd4eb",
+                "on-tertiary-container": "#54436b",
+                "inverse-surface": "#faf9fe",
+                "on-surface-variant": "#a9abb5",
+                "tertiary-container": "#e4ceff",
+                "primary-dim": "#a9b9df",
+                "on-tertiary-fixed-variant": "#5e4c75",
+                "on-secondary-fixed-variant": "#545b6e",
+                "surface-bright": "#292c34",
+                "on-background": "#e3e5f0",
+                "primary-container": "#435274",
+                "surface-container": "#17191f",
+                "outline": "#73757e",
+                "surface-container-highest": "#23262d",
+                "secondary": "#bfc6dc",
+                "tertiary-fixed-dim": "#d6c0f0",
+                "inverse-on-surface": "#545559",
+                "on-secondary-container": "#b8bfd5",
+                "on-error-container": "#ff9993",
+                "on-primary-fixed-variant": "#455476",
+                "surface-variant": "#23262d"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+            },
+            "fontFamily": {
+                "headline": ["Geist"],
+                "display": ["Geist"],
+                "body": ["Geist"],
+                "label": ["Public Sans"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 1.25rem;
+        }
+        body {
+            background-color: #0d0e12;
+            color: #e3e5f0;
+            font-family: 'Geist', sans-serif;
+        }
+        .scan-animation {
+            background: linear-gradient(to right, transparent, rgba(182, 198, 238, 0.1), transparent);
+            background-size: 200% 100%;
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- Top Navigation Anchor (Suppressed based on Transactional rule, but logic kept for structure) -->
+<!-- We skip TopAppBar and NavigationDrawer as per "Automatic Suppression" rule for Onboarding screens -->
+<main class="flex-grow flex items-center justify-center p-6 relative overflow-hidden">
+<!-- Subtle Background Ambient -->
+<div class="absolute inset-0 z-0 pointer-events-none">
+
+</div>
+<!-- Onboarding Container -->
+<div class="w-full max-w-[480px] z-10">
+<div class="bg-surface-container border border-outline-variant rounded-lg p-8 shadow-2xl">
+<!-- Header -->
+<div class="mb-8">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary" data-icon="terminal">terminal</span>
+<span class="text-xs font-mono uppercase tracking-[0.2em] text-on-surface-variant">Setup Phase 01</span>
+</div>
+<h1 class="text-2xl font-black font-headline text-on-surface tracking-tight">Welcome to devpipe</h1>
+<p class="text-sm text-on-surface-variant mt-2 font-medium">Detecting coding agents installed on this machine.</p>
+</div>
+<!-- Detection Status Card Section -->
+<div class="space-y-4 mb-8">
+<h2 class="text-[10px] font-bold uppercase tracking-widest text-outline">Local agents</h2>
+<div class="border border-outline-variant rounded bg-surface-container-low overflow-hidden">
+<!-- Row 1: Active/Selected -->
+<div class="relative p-4 flex items-center justify-between border-b border-outline-variant bg-primary-container/10">
+<!-- Selection highlight -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded flex items-center justify-center bg-surface-container-highest border border-primary/30">
+<span class="material-symbols-outlined text-primary" data-icon="memory" style="font-variation-settings: 'FILL' 1;">memory</span>
+</div>
+<div>
+<div class="text-sm font-bold text-on-surface">Claude Code</div>
+<div class="text-[11px] font-mono text-primary/80 uppercase">Anthropic CLI v0.1.5</div>
+</div>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="px-2 py-0.5 rounded-full bg-primary text-on-primary text-[10px] font-black uppercase tracking-tighter flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                    detected
+                                </span>
+</div>
+</div>
+<!-- Row 2: Dimmed/Not Found -->
+<div class="p-4 flex items-center justify-between opacity-40 bg-surface-container-low">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded flex items-center justify-center bg-surface-container-highest border border-outline-variant">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="rocket_launch">rocket_launch</span>
+</div>
+<div>
+<div class="text-sm font-bold text-on-surface-variant">Cursor</div>
+<div class="text-[11px] font-mono text-outline uppercase italic">Binary missing from $PATH</div>
+</div>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="px-2 py-0.5 rounded-full border border-outline text-outline text-[10px] font-bold uppercase tracking-tighter flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]" data-icon="error">error</span>
+                                    not found
+                                </span>
+</div>
+</div>
+</div>
+<!-- Progress Indicator -->
+<div class="relative h-1 w-full bg-surface-container-highest rounded-full overflow-hidden mt-6">
+<div class="absolute inset-0 scan-animation"></div>
+<div class="absolute inset-y-0 left-0 bg-primary w-2/3 transition-all duration-1000 ease-in-out"></div>
+</div>
+<div class="flex justify-between items-center text-[10px] font-mono text-outline uppercase">
+<span>Scanning $PATH...</span>
+<span>67% Complete</span>
+</div>
+</div>
+<!-- CTA -->
+<button class="w-full h-12 bg-primary text-on-primary hover:bg-primary-fixed-dim active:opacity-90 transition-all font-bold text-sm uppercase tracking-widest flex items-center justify-center gap-2 rounded">
+                    Continue
+                    <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<!-- Footer Meta -->
+<div class="mt-6 pt-6 border-t border-outline-variant/30 flex items-center justify-between">
+<div class="text-[10px] font-mono text-outline flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary/40 animate-pulse"></span>
+                        LOCAL_ENGINE: READY
+                    </div>
+<div class="text-[10px] font-mono text-outline">
+                        v0.8.2-stable
+                    </div>
+</div>
+</div>
+<!-- Hint text below card -->
+<p class="text-center mt-6 text-[11px] text-on-surface-variant/60 font-mono">
+                Press <kbd class="px-1.5 py-0.5 rounded border border-outline-variant bg-surface-container-highest text-on-surface">Enter</kbd> to proceed or <kbd class="px-1.5 py-0.5 rounded border border-outline-variant bg-surface-container-highest text-on-surface">ESC</kbd> to cancel.
+            </p>
+</div>
+</main>
+<script>
+        // Micro-interaction for the continue button
+        const btn = document.querySelector('button');
+        btn.addEventListener('click', () => {
+            btn.innerHTML = `
+                <span class="material-symbols-outlined animate-spin" data-icon="progress_activity">progress_activity</span>
+                Initializing...
+            `;
+            btn.classList.add('opacity-80');
+            btn.disabled = true;
+            
+            // Artificial delay to simulate transition
+            setTimeout(() => {
+                btn.innerHTML = `
+                    DONE
+                    <span class="material-symbols-outlined" data-icon="done_all">done_all</span>
+                `;
+                btn.classList.replace('bg-primary', 'bg-green-600');
+            }, 1200);
+        });
+
+        // Keyboard listener for onboarding feel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                btn.click();
+            }
+        });
+    </script>
+</body></html>

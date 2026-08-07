@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>devpipe - Stage 03 Approved</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist.min.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#545559",
+                        "on-secondary": "#384052",
+                        "on-background": "#e3e5f0",
+                        "primary-fixed-dim": "#b9c9f0",
+                        "surface-variant": "#23262d",
+                        "tertiary-fixed-dim": "#d6c0f0",
+                        "primary-dim": "#a9b9df",
+                        "on-tertiary-container": "#54436b",
+                        "on-secondary-fixed-variant": "#545b6e",
+                        "on-primary-fixed": "#283858",
+                        "tertiary": "#efdfff",
+                        "surface-container-highest": "#23262d",
+                        "on-error-container": "#ff9993",
+                        "on-primary-container": "#d9e3ff",
+                        "on-secondary-fixed": "#383f51",
+                        "surface-bright": "#292c34",
+                        "inverse-surface": "#faf9fe",
+                        "on-tertiary": "#5d4c74",
+                        "on-surface": "#e3e5f0",
+                        "error-dim": "#c54d4a",
+                        "primary": "#b6c6ee",
+                        "surface-container-low": "#111318",
+                        "surface-container-high": "#1d1f26",
+                        "surface-tint": "#b6c6ee",
+                        "on-primary-fixed-variant": "#455476",
+                        "on-error": "#490006",
+                        "error": "#fa746f",
+                        "secondary-container": "#343b4d",
+                        "primary-container": "#435274",
+                        "tertiary-fixed": "#e4ceff",
+                        "secondary-dim": "#b1b8ce",
+                        "primary-fixed": "#c7d7ff",
+                        "error-container": "#871f21",
+                        "surface-container": "#17191f",
+                        "outline-variant": "#454850",
+                        "on-surface-variant": "#a9abb5",
+                        "surface": "#0d0e12",
+                        "tertiary-dim": "#d6c0f0",
+                        "inverse-primary": "#4f5f81",
+                        "tertiary-container": "#e4ceff",
+                        "on-primary": "#304060",
+                        "on-secondary-container": "#b8bfd5",
+                        "on-tertiary-fixed-variant": "#5e4c75",
+                        "background": "#0d0e12",
+                        "surface-dim": "#0d0e12",
+                        "surface-container-lowest": "#000000",
+                        "secondary-fixed": "#dbe2f9",
+                        "secondary": "#bfc6dc",
+                        "outline": "#73757e",
+                        "on-tertiary-fixed": "#413057",
+                        "secondary-fixed-dim": "#cdd4eb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Geist", "monospace"],
+                        "display": ["Geist", "monospace"],
+                        "body": ["Geist", "sans-serif"],
+                        "label": ["Public Sans", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Geist', sans-serif;
+            background-color: #0d0e12;
+            color: #e3e5f0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .stepper-line::before {
+            content: '';
+            position: absolute;
+            left: 11px;
+            top: 24px;
+            bottom: -12px;
+            width: 1px;
+            background-color: #454850;
+        }
+        .stepper-item:last-child .stepper-line::before {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-surface border-b border-outline-variant h-14 flex items-center justify-between px-4">
+<div class="flex items-center gap-4">
+<a class="flex items-center gap-2 text-on-surface-variant hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-lg">arrow_back</span>
+<span class="text-sm font-medium tracking-tight">Back to Board</span>
+</a>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">terminal</span>
+<span class="text-xl font-headline font-black tracking-tighter text-on-surface">devpipe</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 rounded-md hover:bg-surface-variant text-on-surface-variant transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined text-xl">settings</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Layout -->
+<main class="pt-24 pb-12 px-6 flex justify-center">
+<div class="w-full max-width-[720px] max-w-2xl">
+<!-- Card Header Section -->
+<div class="mb-10">
+<div class="flex items-start justify-between mb-2">
+<h1 class="text-3xl font-headline font-bold tracking-tight text-on-surface">Write onboarding docs</h1>
+<span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-widest bg-surface-variant text-on-surface-variant border border-outline-variant">IDLE</span>
+</div>
+<div class="flex items-center gap-2 text-sm font-mono text-on-surface-variant">
+<span class="opacity-70">~/code/docs</span>
+<span class="text-outline">•</span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">memory</span>
+                        agent: claude
+                    </span>
+</div>
+</div>
+<!-- Vertical Stepper (Accordion-based) -->
+<div class="space-y-0">
+<!-- Stage 01 -->
+<div class="stepper-item relative pb-6">
+<div class="stepper-line"></div>
+<div class="flex items-center gap-4 mb-1">
+<div class="relative z-10 w-6 h-6 rounded-full bg-primary-container flex items-center justify-center border border-primary">
+<span class="material-symbols-outlined text-[14px] text-on-primary-container" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<h3 class="text-sm font-bold tracking-wider text-on-surface uppercase">01 PRD</h3>
+</div>
+</div>
+<!-- Stage 02 -->
+<div class="stepper-item relative pb-6">
+<div class="stepper-line"></div>
+<div class="flex items-center gap-4 mb-1">
+<div class="relative z-10 w-6 h-6 rounded-full bg-primary-container flex items-center justify-center border border-primary">
+<span class="material-symbols-outlined text-[14px] text-on-primary-container" style="font-variation-settings: 'wght' 700;">check</span>
+</div>
+<h3 class="text-sm font-bold tracking-wider text-on-surface uppercase">02 PLAN</h3>
+</div>
+</div>
+<!-- Stage 03 - ACTIVE -->
+<div class="stepper-item relative pb-10">
+<div class="stepper-line"></div>
+<div class="flex items-start gap-4">
+<div class="relative z-10 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-[0_0_15px_rgba(182,198,238,0.3)]">
+<div class="w-2 h-2 rounded-full bg-on-primary"></div>
+</div>
+<div class="flex-1 -mt-1 bg-surface-container p-6 rounded-lg border border-primary/30">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-sm font-bold tracking-wider text-primary uppercase">03 APPROVED</h3>
+<span class="text-[10px] font-mono text-primary/60">ACTIVE</span>
+</div>
+<p class="text-on-surface-variant text-sm mb-6 leading-relaxed">
+                                Plan approved. Ready to build. The technical specifications and agent constraints have been verified. No pending blockers detected.
+                            </p>
+<button class="group flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded font-bold text-sm tracking-tight hover:brightness-110 transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-lg" style="font-variation-settings: 'FILL' 1;">bolt</span>
+                                Start Build
+                            </button>
+</div>
+</div>
+</div>
+<!-- Stage 04 - LOCKED -->
+<div class="stepper-item relative pb-6 opacity-40 grayscale">
+<div class="stepper-line"></div>
+<div class="flex items-center gap-4">
+<div class="relative z-10 w-6 h-6 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">lock</span>
+</div>
+<h3 class="text-sm font-bold tracking-wider text-on-surface-variant uppercase">04 BUILD</h3>
+</div>
+</div>
+<!-- Stage 05 - LOCKED -->
+<div class="stepper-item relative pb-6 opacity-40 grayscale">
+<div class="stepper-line"></div>
+<div class="flex items-center gap-4">
+<div class="relative z-10 w-6 h-6 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">lock</span>
+</div>
+<h3 class="text-sm font-bold tracking-wider text-on-surface-variant uppercase">05 SIMULATE</h3>
+</div>
+</div>
+<!-- Stage 06 - LOCKED -->
+<div class="stepper-item relative pb-6 opacity-40 grayscale">
+<div class="stepper-line"></div>
+<div class="flex items-center gap-4">
+<div class="relative z-10 w-6 h-6 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">lock</span>
+</div>
+<h3 class="text-sm font-bold tracking-wider text-on-surface-variant uppercase">06 TEST</h3>
+</div>
+</div>
+<!-- Stage 07 - LOCKED -->
+<div class="stepper-item relative pb-6 opacity-40 grayscale">
+<div class="stepper-line"></div>
+<div class="flex items-center gap-4">
+<div class="relative z-10 w-6 h-6 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">lock</span>
+</div>
+<h3 class="text-sm font-bold tracking-wider text-on-surface-variant uppercase">07 DOCS</h3>
+</div>
+</div>
+<!-- Stage 08 - LOCKED -->
+<div class="stepper-item relative opacity-40 grayscale">
+<div class="stepper-line"></div>
+<div class="flex items-center gap-4">
+<div class="relative z-10 w-6 h-6 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">lock</span>
+</div>
+<h3 class="text-sm font-bold tracking-wider text-on-surface-variant uppercase">08 DEPLOY</h3>
+</div>
+</div>
+</div>
+<!-- Terminal/Logs Section (Aesthetic Filler for Developer Context) -->
+<div class="mt-12 p-4 bg-surface-container-low rounded-lg border border-outline-variant/30 font-mono text-[11px] text-on-surface-variant leading-relaxed">
+<div class="flex items-center justify-between mb-2 opacity-50">
+<span class="uppercase tracking-widest text-[9px] font-bold">Local Environment Log</span>
+<span class="flex gap-1.5">
+<div class="w-1.5 h-1.5 rounded-full bg-outline-variant"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-outline-variant"></div>
+</span>
+</div>
+<div class="space-y-1">
+<p><span class="text-primary">[14:22:01]</span> INFO: Plan hash validated: 8c9f2a...</p>
+<p><span class="text-primary">[14:22:03]</span> INFO: Agent "Claude" connection stable.</p>
+<p><span class="text-primary">[14:22:04]</span> SUCCESS: Stage 02 Plan verification complete.</p>
+<p><span class="text-primary">[14:22:05]</span> <span class="text-secondary">AWAITING: User interaction 'Start Build'</span></p>
+</div>
+</div>
+</div>
+</main>
+<!-- Micro-interaction Scripts -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const startBtn = document.querySelector('button');
+            if (startBtn) {
+                startBtn.addEventListener('mousedown', () => {
+                    startBtn.style.transform = 'scale(0.96)';
+                });
+                startBtn.addEventListener('mouseup', () => {
+                    startBtn.style.transform = 'scale(1)';
+                });
+                startBtn.addEventListener('mouseleave', () => {
+                    startBtn.style.transform = 'scale(1)';
+                });
+            }
+        });
+    </script>
+</body></html>

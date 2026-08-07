@@ -1,0 +1,273 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: 'Space Grotesk Variable', sans-serif;
+    --font-headline: 'Space Grotesk Variable', sans-serif;
+    --font-sans: 'Inter Variable', sans-serif;
+    --font-mono: 'JetBrains Mono Variable', monospace;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    color-scheme: light;
+    /* Custom theme, Cobalt-anchored (hue ~256) — see fe/design.md.
+       Cool engineered paper + one electric-blue signal accent. */
+    --background: oklch(98.5% 0.004 250);
+    --foreground: oklch(24% 0.02 258);
+    --card: oklch(97.3% 0.005 250);
+    --card-foreground: oklch(24% 0.02 258);
+    --popover: oklch(99% 0.003 250);
+    --popover-foreground: oklch(24% 0.02 258);
+    --primary: oklch(58% 0.20 256);
+    --primary-foreground: oklch(99% 0.01 250);
+    --secondary: oklch(95% 0.008 252);
+    --secondary-foreground: oklch(24% 0.02 258);
+    --muted: oklch(96% 0.006 251);
+    --muted-foreground: oklch(46% 0.015 255);
+    --accent: oklch(95% 0.008 252);
+    --accent-foreground: oklch(24% 0.02 258);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(90% 0.01 253);
+    --input: oklch(90% 0.01 253);
+    --ring: oklch(58% 0.20 256);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(97.3% 0.005 250);
+    --sidebar-foreground: oklch(24% 0.02 258);
+    --sidebar-primary: oklch(58% 0.20 256);
+    --sidebar-primary-foreground: oklch(99% 0.01 250);
+    --sidebar-accent: oklch(95% 0.008 252);
+    --sidebar-accent-foreground: oklch(24% 0.02 258);
+    --sidebar-border: oklch(90% 0.01 253);
+    --sidebar-ring: oklch(58% 0.20 256);
+
+    /* Motion — theme-independent, shared light/dark. Hallmark discipline:
+       named easings + duration buckets, never freestyle values inline. */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --dur-micro: 120ms;
+    --dur-short: 220ms;
+    --dur-long: 420ms;
+
+    /* Named glow — replaces hand-rolled rgba() approximations of --primary.
+       color-mix works on the resolved value, so this is correct whether
+       --primary is the light theme's oklch() or the dark theme's hex. */
+    --shadow-glow-primary: 0 0 8px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.dark {
+    color-scheme: dark;
+    /* Custom theme, Cobalt-anchored (hue ~256) — see fe/design.md.
+       Same hue family as the earlier Stitch periwinkle primary, tightened
+       into a real OKLCH pair with the light mode above. */
+    --background: oklch(22% 0.016 260);
+    --foreground: oklch(94% 0.01 250);
+    --card: oklch(25% 0.016 259);
+    --card-foreground: oklch(94% 0.01 250);
+    --popover: oklch(27% 0.015 259);
+    --popover-foreground: oklch(94% 0.01 250);
+    --primary: oklch(72% 0.16 256);
+    --primary-foreground: oklch(20% 0.03 258);
+    --secondary: oklch(28% 0.014 259);
+    --secondary-foreground: oklch(94% 0.01 250);
+    --muted: oklch(24% 0.014 259);
+    --muted-foreground: oklch(68% 0.012 255);
+    --accent: oklch(28% 0.014 259);
+    --accent-foreground: oklch(94% 0.01 250);
+    --destructive: #fa746f; /* error — unchanged */
+    --border: oklch(36% 0.014 258);
+    --input: oklch(36% 0.014 258);
+    --ring: oklch(72% 0.16 256);
+    --radius: 0.5rem;
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(25% 0.016 259);
+    --sidebar-foreground: oklch(94% 0.01 250);
+    --sidebar-primary: oklch(72% 0.16 256);
+    --sidebar-primary-foreground: oklch(20% 0.03 258);
+    --sidebar-accent: oklch(28% 0.014 259);
+    --sidebar-accent-foreground: oklch(94% 0.01 250);
+    --sidebar-border: oklch(36% 0.014 258);
+    --sidebar-ring: oklch(72% 0.16 256);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+  /* Page-level headings don't all opt into font-heading individually —
+     default every heading element to the display face so Space Grotesk
+     shows up without touching each page file. */
+  h1, h2, h3 {
+    @apply font-heading;
+    }
+  /* Chromium forces a white input background on autofill/history-matched
+     fields (e.g. filesystem paths), ignoring bg-input entirely. Force it
+     back to the theme's input color instead of letting the browser win. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--foreground);
+    caret-color: var(--foreground);
+    box-shadow: 0 0 0px 1000px var(--input) inset;
+    transition: background-color 5000s ease-in-out 0s;
+    }
+}
+
+/* Hallmark · genre: modern-minimal · theme: custom (Cobalt-anchored, hue 256)
+ * design-system: design.md · designed-as-app
+ * Full theme redesign — light mode designed for the first time (was
+ * shadcn's untouched greyscale scaffold), dark mode retuned onto the same
+ * OKLCH pair. Fonts: Space Grotesk (display) + Inter (body) + JetBrains
+ * Mono (labels/code/terminal) replace Geist everywhere. See fe/design.md.
+ */
+
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4
+ * macrostructure: Bento Grid (Board.tsx, adapted, app-scope) · genre: modern-minimal
+ * theme: existing devpipe tokens (preserved, not catalog) · enrichment: none
+ * nav/footer: N/A — dashboard app, no marketing surface
+ * scope: fe/src/pages/Board.tsx, then site-wide hygiene pass (tasteskill +
+ *   Hallmark discipline propagated to every page/component — see
+ *   .hallmark/log.json for the full file list) — transition-all removed,
+ *   focus-visible added everywhere, hand-rolled colors deduped into tokens
+ */
+@layer components {
+  /* Named, specific-property transitions — never transition-all. One
+     signal (lift + border) on hover, presses back down on active. */
+  .card-interactive {
+    transition:
+      transform var(--dur-short) var(--ease-out),
+      border-color var(--dur-short) var(--ease-out);
+  }
+  .card-interactive:hover {
+    transform: translateY(-2px);
+  }
+  .card-interactive:active {
+    transform: translateY(0);
+    transition-duration: var(--dur-micro);
+  }
+
+  /* Same discipline for raw (non-shadcn) buttons — color transition only,
+     a physical press-down on active. No hover:scale, no transition-all. */
+  .btn-interactive {
+    transition: background-color var(--dur-short) var(--ease-out),
+      border-color var(--dur-short) var(--ease-out),
+      color var(--dur-short) var(--ease-out),
+      opacity var(--dur-short) var(--ease-out);
+  }
+  .btn-interactive:active {
+    transform: scale(0.98);
+    transition-duration: var(--dur-micro);
+  }
+
+  /* Focus ring — instant, never animated in (keyboard users need it the
+     moment focus lands). Use on every raw interactive element; shadcn
+     primitives (Button, Select, etc.) already ship their own. */
+  .focus-ring {
+    outline: none;
+  }
+  .focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+  }
+
+  /* One shared terminal/log panel treatment — was duplicated as literal
+     bg-black text-green-400 across five files. */
+  .terminal-panel {
+    background-color: #000;
+    color: #4ade80; /* tailwind green-400 — the terminal's own accent, not the theme's */
+  }
+
+  /* One-shot grid-entrance stagger, indexed via --i. Never re-fires on
+     scroll — this runs once on mount, not an intersection observer. */
+  .reveal {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: reveal var(--dur-long) var(--ease-out) forwards;
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
+  @keyframes reveal {
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 150ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 150ms !important;
+  }
+  .reveal {
+    animation: reveal-reduced 150ms linear forwards;
+  }
+  @keyframes reveal-reduced {
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}

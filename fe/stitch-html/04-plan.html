@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>devpipe - 02 Plan</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&amp;family=Geist:wght@100;300;400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-dim": "#b1b8ce",
+                        "on-primary-fixed": "#283858",
+                        "error": "#fa746f",
+                        "on-tertiary": "#5d4c74",
+                        "surface-container-low": "#111318",
+                        "primary-fixed-dim": "#b9c9f0",
+                        "primary-dim": "#a9b9df",
+                        "primary-fixed": "#c7d7ff",
+                        "on-tertiary-container": "#54436b",
+                        "surface-container-highest": "#23262d",
+                        "on-secondary": "#384052",
+                        "tertiary-dim": "#d6c0f0",
+                        "background": "#0d0e12",
+                        "tertiary-fixed": "#e4ceff",
+                        "on-secondary-fixed-variant": "#545b6e",
+                        "on-background": "#e3e5f0",
+                        "outline": "#73757e",
+                        "on-primary-fixed-variant": "#455476",
+                        "on-primary": "#304060",
+                        "primary-container": "#435274",
+                        "primary": "#b6c6ee",
+                        "error-dim": "#c54d4a",
+                        "secondary": "#bfc6dc",
+                        "surface-container": "#17191f",
+                        "on-secondary-container": "#b8bfd5",
+                        "secondary-container": "#343b4d",
+                        "on-secondary-fixed": "#383f51",
+                        "secondary-fixed-dim": "#cdd4eb",
+                        "surface-variant": "#23262d",
+                        "on-tertiary-fixed": "#413057",
+                        "surface-container-lowest": "#000000",
+                        "tertiary": "#efdfff",
+                        "secondary-fixed": "#dbe2f9",
+                        "surface-tint": "#b6c6ee",
+                        "tertiary-container": "#e4ceff",
+                        "inverse-surface": "#faf9fe",
+                        "surface-dim": "#0d0e12",
+                        "error-container": "#871f21",
+                        "surface-container-high": "#1d1f26",
+                        "outline-variant": "#454850",
+                        "on-error": "#490006",
+                        "tertiary-fixed-dim": "#d6c0f0",
+                        "inverse-on-surface": "#545559",
+                        "surface": "#0d0e12",
+                        "inverse-primary": "#4f5f81",
+                        "on-surface-variant": "#a9abb5",
+                        "surface-bright": "#292c34",
+                        "on-primary-container": "#d9e3ff",
+                        "on-tertiary-fixed-variant": "#5e4c75",
+                        "on-error-container": "#ff9993",
+                        "on-surface": "#e3e5f0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "headline": ["Geist"],
+                        "display": ["Geist"],
+                        "body": ["Geist"],
+                        "label": ["Public Sans"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #0d0e12;
+            color: #e3e5f0;
+            font-family: 'Geist', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 20px;
+        }
+        .step-active {
+            border-left: 2px solid #b6c6ee;
+        }
+        .mono {
+            font-family: 'Geist Mono', 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- Top Navigation Bar -->
+<header class="bg-surface border-b border-outline-variant fixed top-0 w-full z-50">
+<div class="flex justify-between items-center w-full px-4 h-14">
+<div class="flex items-center gap-4">
+<a class="text-on-surface-variant hover:text-on-surface flex items-center gap-2 transition-colors duration-150" href="#">
+<span class="material-symbols-outlined">arrow_back</span>
+<span class="text-sm font-medium">Back to Board</span>
+</a>
+</div>
+<div class="flex items-center gap-4">
+<div class="text-primary text-xl font-headline font-black tracking-tighter">devpipe</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors">settings</span>
+</div>
+</div>
+</header>
+<main class="pt-20 pb-20 px-4">
+<div class="max-w-[720px] mx-auto space-y-8">
+<!-- Page Header -->
+<section class="space-y-3">
+<div class="flex items-start justify-between">
+<div class="space-y-1">
+<h1 class="text-3xl font-bold tracking-tight text-on-surface">Write onboarding docs</h1>
+<p class="text-sm text-on-surface-variant mono">~/code/docs • agent: claude</p>
+</div>
+<div class="px-2 py-1 bg-surface-container-high border border-outline-variant rounded text-[10px] font-bold tracking-widest text-on-surface-variant uppercase flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+                        IDLE
+                    </div>
+</div>
+</section>
+<!-- Stepper Container -->
+<section class="space-y-1">
+<!-- 01 PRD (Completed) -->
+<div class="border border-outline-variant bg-surface-container-low rounded-lg overflow-hidden opacity-70">
+<button class="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-variant transition-all duration-150 group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-xs font-bold tracking-wider text-on-surface-variant uppercase">01 PRD</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary">expand_more</span>
+</button>
+</div>
+<!-- 02 PLAN (Active & Expanded) -->
+<div class="border border-primary-container bg-surface-container rounded-lg overflow-hidden shadow-2xl">
+<div class="w-full flex items-center justify-between px-4 py-4 bg-secondary-container/20 border-b border-outline-variant/30">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">radio_button_checked</span>
+<span class="text-sm font-bold tracking-wider text-primary uppercase">02 PLAN</span>
+</div>
+<span class="material-symbols-outlined text-primary">expand_less</span>
+</div>
+<!-- Plan Content -->
+<div class="p-5 space-y-8">
+<!-- Chat Box -->
+<div class="space-y-3">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 min-h-[120px] relative">
+<p class="text-xs text-on-surface-variant italic mb-2">Comment here to revise the plan</p>
+<div class="flex flex-col gap-2">
+<div class="bg-primary-container/10 p-3 rounded-lg border border-primary/10 max-w-[90%]">
+<p class="text-sm text-on-surface">I've analyzed the PRD. The current plan focuses on the core user journey. Should I include the deployment section as well?</p>
+</div>
+</div>
+</div>
+<div class="flex gap-2">
+<input class="flex-1 bg-surface-container-high border border-outline-variant rounded-md px-4 py-2.5 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-on-surface-variant/50" placeholder="Comment to revise the plan..." type="text"/>
+<button class="bg-primary text-on-primary p-2.5 rounded-md hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+<!-- Editable Tasks -->
+<div class="space-y-4">
+<div class="flex items-center justify-between border-b border-outline-variant pb-2">
+<h3 class="text-[10px] font-black tracking-[0.2em] text-on-surface-variant uppercase">Tasks — Editable</h3>
+<span class="text-[10px] text-on-surface-variant/50">4 ITEMS</span>
+</div>
+<div class="space-y-1">
+<!-- Task Item -->
+<div class="group flex items-center gap-3 p-3 bg-surface-container-high border border-outline-variant/50 rounded hover:border-outline transition-colors">
+<span class="text-xs mono text-on-surface-variant">1.</span>
+<span class="text-sm text-on-surface flex-1">Write install prerequisites section</span>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">keyboard_arrow_up</span></button>
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">keyboard_arrow_down</span></button>
+<button class="p-1 hover:bg-error/20 hover:text-error rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">close</span></button>
+</div>
+</div>
+<!-- Task Item -->
+<div class="group flex items-center gap-3 p-3 bg-surface-container-high border border-outline-variant/50 rounded hover:border-outline transition-colors">
+<span class="text-xs mono text-on-surface-variant">2.</span>
+<span class="text-sm text-on-surface flex-1">Document agent detection flow</span>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">keyboard_arrow_up</span></button>
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">keyboard_arrow_down</span></button>
+<button class="p-1 hover:bg-error/20 hover:text-error rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">close</span></button>
+</div>
+</div>
+<!-- Task Item -->
+<div class="group flex items-center gap-3 p-3 bg-surface-container-high border border-outline-variant/50 rounded hover:border-outline transition-colors">
+<span class="text-xs mono text-on-surface-variant">3.</span>
+<span class="text-sm text-on-surface flex-1">Write first card walkthrough with screenshots</span>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">keyboard_arrow_up</span></button>
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">keyboard_arrow_down</span></button>
+<button class="p-1 hover:bg-error/20 hover:text-error rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">close</span></button>
+</div>
+</div>
+<!-- Task Item -->
+<div class="group flex items-center gap-3 p-3 bg-surface-container-high border border-outline-variant/50 rounded hover:border-outline transition-colors">
+<span class="text-xs mono text-on-surface-variant">4.</span>
+<span class="text-sm text-on-surface flex-1">Add troubleshooting FAQ</span>
+<div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">keyboard_arrow_up</span></button>
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">keyboard_arrow_down</span></button>
+<button class="p-1 hover:bg-error/20 hover:text-error rounded text-on-surface-variant"><span class="material-symbols-outlined text-[18px]">close</span></button>
+</div>
+</div>
+<!-- Add Task Input -->
+<div class="flex items-center gap-3 p-3 bg-surface-container-lowest border border-dashed border-outline-variant rounded">
+<span class="material-symbols-outlined text-on-surface-variant/50">add</span>
+<input class="bg-transparent border-none p-0 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:ring-0 w-full" placeholder="Add task..." type="text"/>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-3 pt-4 border-t border-outline-variant/30">
+<button class="flex-1 px-4 py-2.5 border border-outline-variant text-on-surface text-sm font-medium rounded hover:bg-surface-variant transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">refresh</span>
+                                Regenerate from PRD
+                            </button>
+<button class="flex-1 px-4 py-2.5 bg-primary text-on-primary text-sm font-bold rounded hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">check</span>
+                                Approve Plan
+                            </button>
+</div>
+</div>
+</div>
+<!-- Locked Steps (03-08) -->
+<div class="space-y-1">
+<!-- Step Component Factory (Mimicked for efficiency) -->
+<div class="border border-outline-variant bg-surface-container-low rounded-lg opacity-40">
+<div class="w-full flex items-center justify-between px-4 py-3 cursor-not-allowed">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">lock</span>
+<span class="text-[11px] font-bold tracking-wider text-on-surface-variant uppercase">03 APPROVED</span>
+</div>
+</div>
+</div>
+<div class="border border-outline-variant bg-surface-container-low rounded-lg opacity-40">
+<div class="w-full flex items-center justify-between px-4 py-3 cursor-not-allowed">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">lock</span>
+<span class="text-[11px] font-bold tracking-wider text-on-surface-variant uppercase">04 BUILD</span>
+</div>
+</div>
+</div>
+<div class="border border-outline-variant bg-surface-container-low rounded-lg opacity-40">
+<div class="w-full flex items-center justify-between px-4 py-3 cursor-not-allowed">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">lock</span>
+<span class="text-[11px] font-bold tracking-wider text-on-surface-variant uppercase">05 SIMULATE</span>
+</div>
+</div>
+</div>
+<div class="border border-outline-variant bg-surface-container-low rounded-lg opacity-40">
+<div class="w-full flex items-center justify-between px-4 py-3 cursor-not-allowed">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">lock</span>
+<span class="text-[11px] font-bold tracking-wider text-on-surface-variant uppercase">06 TEST</span>
+</div>
+</div>
+</div>
+<div class="border border-outline-variant bg-surface-container-low rounded-lg opacity-40">
+<div class="w-full flex items-center justify-between px-4 py-3 cursor-not-allowed">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">lock</span>
+<span class="text-[11px] font-bold tracking-wider text-on-surface-variant uppercase">07 DOCS</span>
+</div>
+</div>
+</div>
+<div class="border border-outline-variant bg-surface-container-low rounded-lg opacity-40">
+<div class="w-full flex items-center justify-between px-4 py-3 cursor-not-allowed">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">lock</span>
+<span class="text-[11px] font-bold tracking-wider text-on-surface-variant uppercase">08 DEPLOY</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- Footer Progress Indicator -->
+<footer class="fixed bottom-0 w-full bg-surface-container-high/80 backdrop-blur-md border-t border-outline-variant h-1 px-4 flex items-center">
+<div class="w-full max-w-[720px] mx-auto h-1 bg-surface-variant relative overflow-hidden rounded-full">
+<div class="absolute left-0 top-0 h-full bg-primary transition-all duration-700 ease-in-out" style="width: 25%;"></div>
+</div>
+</footer>
+<script>
+        // Simple interactive demo logic
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && input.value.trim() !== '') {
+                    console.log('Action recorded:', input.value);
+                    input.value = '';
+                }
+            });
+        });
+    </script>
+</body></html>

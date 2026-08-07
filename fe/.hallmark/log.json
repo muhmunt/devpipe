@@ -1,0 +1,26 @@
+[
+  {
+    "date": "2026-07-28",
+    "scope": "app",
+    "theme": "custom",
+    "theme_axes": "dual-mode / grotesk-sans+mono / electric-blue 256",
+    "macrostructure": "N/A — token/type pass, no layout change",
+    "brief": "devpipe · full theme redesign via design.md (Cobalt-anchored custom palette + Space Grotesk/Inter/JetBrains Mono, light mode designed for the first time)"
+  },
+  {
+    "date": "2026-07-28",
+    "macrostructure": "Bento Grid",
+    "theme": "existing (devpipe tokens, preserved)",
+    "enrichment": "none",
+    "scope": "single-page",
+    "brief": "devpipe · redesign Board.tsx (pipeline dashboard) with hallmark redesign"
+  },
+  {
+    "date": "2026-07-28",
+    "macrostructure": "N/A — hygiene pass, no macrostructure change",
+    "theme": "existing (devpipe tokens, preserved)",
+    "enrichment": "none",
+    "scope": "site-wide",
+    "brief": "devpipe · propagate Board.tsx's anti-pattern fixes (transition-all, focus-visible, hand-rolled status colors, silent empty states) across remaining pages/components — tasteskill scope check flagged this app as 100% dashboard surface, so no landing-page patterns applied"
+  }
+]

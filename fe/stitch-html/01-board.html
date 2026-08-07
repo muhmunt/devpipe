@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>devpipe | Pipeline Board</title>
+<!-- Google Fonts: Geist for headlines/body, Public Sans for labels -->
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.cdnfonts.com/css/geist" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-low": "#111318",
+                    "on-secondary-fixed-variant": "#545b6e",
+                    "inverse-surface": "#faf9fe",
+                    "surface-container": "#17191f",
+                    "on-background": "#e3e5f0",
+                    "on-error": "#490006",
+                    "on-tertiary-fixed-variant": "#5e4c75",
+                    "secondary-dim": "#b1b8ce",
+                    "primary": "#b6c6ee",
+                    "error": "#fa746f",
+                    "tertiary-fixed-dim": "#d6c0f0",
+                    "secondary-fixed-dim": "#cdd4eb",
+                    "inverse-on-surface": "#545559",
+                    "tertiary-fixed": "#e4ceff",
+                    "tertiary-container": "#e4ceff",
+                    "surface": "#0d0e12",
+                    "secondary": "#bfc6dc",
+                    "on-secondary-container": "#b8bfd5",
+                    "surface-container-high": "#1d1f26",
+                    "surface-container-lowest": "#000000",
+                    "surface-dim": "#0d0e12",
+                    "on-tertiary-fixed": "#413057",
+                    "inverse-primary": "#4f5f81",
+                    "primary-container": "#435274",
+                    "outline-variant": "#454850",
+                    "primary-dim": "#a9b9df",
+                    "on-secondary-fixed": "#383f51",
+                    "secondary-fixed": "#dbe2f9",
+                    "surface-bright": "#292c34",
+                    "on-primary-fixed": "#283858",
+                    "on-tertiary": "#5d4c74",
+                    "on-primary-fixed-variant": "#455476",
+                    "on-tertiary-container": "#54436b",
+                    "on-surface-variant": "#a9abb5",
+                    "on-secondary": "#384052",
+                    "primary-fixed": "#c7d7ff",
+                    "surface-tint": "#b6c6ee",
+                    "secondary-container": "#343b4d",
+                    "tertiary": "#efdfff",
+                    "error-container": "#871f21",
+                    "on-primary-container": "#d9e3ff",
+                    "on-error-container": "#ff9993",
+                    "error-dim": "#c54d4a",
+                    "surface-container-highest": "#23262d",
+                    "primary-fixed-dim": "#b9c9f0",
+                    "outline": "#73757e",
+                    "on-primary": "#304060",
+                    "tertiary-dim": "#d6c0f0",
+                    "on-surface": "#e3e5f0",
+                    "background": "#0d0e12",
+                    "surface-variant": "#23262d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Geist", "monospace"],
+                    "display": ["Geist", "sans-serif"],
+                    "body": ["Geist", "sans-serif"],
+                    "label": ["Public Sans", "sans-serif"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #0d0e12;
+            color: #e3e5f0;
+            font-family: 'Geist', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 1.25rem;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #111318;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #454850;
+            border-radius: 2px;
+        }
+        .pipeline-card:hover {
+            border-color: #73757e;
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+<!-- NavigationDrawer (JSON Authority) -->
+<aside class="flex flex-col h-full py-4 bg-surface-container dark:bg-surface-container h-full w-64 border-r border-outline-variant hidden md:flex shrink-0">
+<div class="px-6 mb-8 flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="terminal">terminal</span>
+<span class="text-lg font-headline font-bold text-on-surface">DEVPIPE_ROOT</span>
+</div>
+<nav class="flex-1 space-y-1 px-3">
+<!-- Active: Pipeline (Board view) -->
+<div class="cursor-pointer duration-150 flex items-center gap-3 px-3 py-2.5 font-body text-sm uppercase tracking-wider bg-secondary-container dark:bg-secondary-container text-on-secondary-container dark:text-on-secondary-container border-l-4 border-primary">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span>Pipeline</span>
+</div>
+<div class="cursor-pointer duration-150 flex items-center gap-3 px-3 py-2.5 font-body text-sm uppercase tracking-wider text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined" data-icon="memory">memory</span>
+<span>Agents</span>
+</div>
+<div class="cursor-pointer duration-150 flex items-center gap-3 px-3 py-2.5 font-body text-sm uppercase tracking-wider text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span>Logs</span>
+</div>
+<div class="cursor-pointer duration-150 flex items-center gap-3 px-3 py-2.5 font-body text-sm uppercase tracking-wider text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined" data-icon="biotech">biotech</span>
+<span>Simulate</span>
+</div>
+<div class="cursor-pointer duration-150 flex items-center gap-3 px-3 py-2.5 font-body text-sm uppercase tracking-wider text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span>Docs</span>
+</div>
+<div class="cursor-pointer duration-150 flex items-center gap-3 px-3 py-2.5 font-body text-sm uppercase tracking-wider text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</div>
+</nav>
+<div class="mt-auto px-6 pt-4 border-t border-outline-variant">
+<div class="flex items-center gap-3 py-2 opacity-60">
+<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+<span class="text-[10px] font-mono tracking-tighter">DAEMON: RUNNING</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col min-w-0 bg-surface">
+<!-- TopAppBar (JSON Authority) -->
+<header class="flex justify-between items-center w-full px-6 h-14 bg-surface dark:bg-surface border-b border-outline-variant dark:border-outline-variant sticky top-0 z-20">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="terminal">terminal</span>
+<h1 class="text-xl font-headline font-black tracking-tighter text-on-surface dark:text-on-surface">devpipe</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 bg-primary-container text-on-primary-container px-3 py-1.5 rounded text-xs font-bold hover:bg-opacity-80 transition-all border border-primary/20">
+<span class="material-symbols-outlined !text-sm" data-icon="add">add</span>
+<span>NEW CARD</span>
+</button>
+<div class="h-6 w-[1px] bg-outline-variant"></div>
+<span class="material-symbols-outlined cursor-pointer text-on-surface-variant hover:text-on-surface" data-icon="settings">settings</span>
+</div>
+</header>
+<!-- Board Toolbar -->
+<div class="px-6 py-4 flex items-center justify-between bg-surface-container-low/50 backdrop-blur-sm border-b border-outline-variant/30">
+<div class="flex items-center gap-4">
+<div class="flex items-center bg-surface-container-highest px-3 py-1 rounded border border-outline-variant">
+<span class="material-symbols-outlined text-xs text-outline mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs w-48 font-body" placeholder="Filter tasks..." type="text"/>
+</div>
+<div class="flex items-center gap-2 text-xs font-medium text-on-surface-variant">
+<span class="material-symbols-outlined !text-sm" data-icon="filter_list">filter_list</span>
+<span>View: Grid</span>
+</div>
+</div>
+<div class="flex items-center gap-3 text-[11px] font-mono text-outline uppercase tracking-widest">
+<span>Total: 14</span>
+<span class="w-1 h-1 rounded-full bg-outline"></span>
+<span class="text-blue-400">Running: 3</span>
+</div>
+</div>
+<!-- Dashboard Grid -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-6">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+<!-- Task Card: Running -->
+<div class="pipeline-card bg-surface-container-low border border-outline-variant p-4 transition-all flex flex-col gap-4 relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1 pr-12">
+<h3 class="text-sm font-semibold text-on-surface leading-snug">Refactor auth middleware</h3>
+<p class="text-[10px] font-mono text-on-surface-variant truncate tracking-tight">~/code/api-service · branch: feature/auth-refactor</p>
+</div>
+<span class="absolute top-4 right-4 bg-primary text-on-primary text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 shadow-[0_0_8px_rgba(182,198,238,0.3)] animate-pulse">
+<span class="material-symbols-outlined !text-[10px]" data-icon="sync" style="font-variation-settings: 'wght' 700;">sync</span>
+                            RUNNING
+                        </span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[9px] font-mono text-outline uppercase tracking-wider">
+<span>Stage: BUILDING</span>
+<span>68%</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 68%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between mt-auto pt-3 border-t border-outline-variant/30">
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded border-2 border-surface-container-low bg-surface-container-highest flex items-center justify-center text-[8px] font-bold">C1</div>
+<div class="w-6 h-6 rounded border-2 border-surface-container-low bg-primary text-on-primary flex items-center justify-center text-[8px] font-bold">DP</div>
+</div>
+<span class="text-[10px] font-mono text-outline">Updated 2m ago</span>
+</div>
+</div>
+<!-- Task Card: Success -->
+<div class="pipeline-card bg-surface-container-low border border-outline-variant p-4 transition-all flex flex-col gap-4 relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1 pr-12">
+<h3 class="text-sm font-semibold text-on-surface leading-snug">Migrate DB to pgx v5</h3>
+<p class="text-[10px] font-mono text-on-surface-variant truncate tracking-tight">~/code/db-infra · branch: main</p>
+</div>
+<span class="absolute top-4 right-4 bg-green-900/50 text-green-400 border border-green-400/30 text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined !text-[10px]" data-icon="check_circle" style="font-variation-settings: 'wght' 700;">check_circle</span>
+                            SUCCESS
+                        </span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[9px] font-mono text-outline uppercase tracking-wider">
+<span>Stage: DEPLOYED</span>
+<span>100%</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-green-500 h-full rounded-full" style="width: 100%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between mt-auto pt-3 border-t border-outline-variant/30">
+<button class="text-[10px] font-mono text-primary flex items-center gap-1 hover:underline">
+<span class="material-symbols-outlined !text-xs" data-icon="terminal">terminal</span> View Logs
+                        </button>
+<span class="text-[10px] font-mono text-outline">Updated 1h ago</span>
+</div>
+</div>
+<!-- Task Card: Failed -->
+<div class="pipeline-card bg-surface-container-low border border-outline-variant p-4 transition-all flex flex-col gap-4 relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1 pr-12">
+<h3 class="text-sm font-semibold text-on-surface leading-snug">Fix flaky worktree cleanup</h3>
+<p class="text-[10px] font-mono text-on-surface-variant truncate tracking-tight">~/code/internal-tools · branch: fix/ci</p>
+</div>
+<span class="absolute top-4 right-4 bg-error text-on-error text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined !text-[10px]" data-icon="error" style="font-variation-settings: 'wght' 700;">error</span>
+                            FAILED
+                        </span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[9px] font-mono text-error uppercase tracking-wider">
+<span>Stage: TESTING</span>
+<span>42%</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-error h-full rounded-full" style="width: 42%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between mt-auto pt-3 border-t border-outline-variant/30">
+<button class="text-[10px] font-mono text-error flex items-center gap-1 hover:underline font-bold">
+<span class="material-symbols-outlined !text-xs" data-icon="refresh">refresh</span> RE-RUN
+                        </button>
+<span class="text-[10px] font-mono text-outline">Exited with code 1</span>
+</div>
+</div>
+<!-- Task Card: Blocked -->
+<div class="pipeline-card bg-surface-container-low border border-outline-variant p-4 transition-all flex flex-col gap-4 relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1 pr-12">
+<h3 class="text-sm font-semibold text-on-surface leading-snug">Add rate limiting to API</h3>
+<p class="text-[10px] font-mono text-on-surface-variant truncate tracking-tight">~/code/api-service · branch: security/limits</p>
+</div>
+<span class="absolute top-4 right-4 bg-amber-500 text-black text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined !text-[10px]" data-icon="block" style="font-variation-settings: 'wght' 700;">block</span>
+                            BLOCKED
+                        </span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[9px] font-mono text-outline uppercase tracking-wider">
+<span>Stage: APPROVED</span>
+<span>25%</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-amber-500 h-full rounded-full" style="width: 25%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between mt-auto pt-3 border-t border-outline-variant/30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-xs text-amber-500" data-icon="lock">lock</span>
+<span class="text-[10px] font-mono text-on-surface-variant italic">Waiting for reviewer</span>
+</div>
+</div>
+</div>
+<!-- Task Card: Idle -->
+<div class="pipeline-card bg-surface-container-low border border-outline-variant p-4 transition-all flex flex-col gap-4 relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1 pr-12">
+<h3 class="text-sm font-semibold text-on-surface leading-snug">Write onboarding docs</h3>
+<p class="text-[10px] font-mono text-on-surface-variant truncate tracking-tight">~/code/docs · branch: docs/init</p>
+</div>
+<span class="absolute top-4 right-4 border border-outline text-outline text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined !text-[10px]" data-icon="pause" style="font-variation-settings: 'wght' 700;">pause</span>
+                            IDLE
+                        </span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[9px] font-mono text-outline uppercase tracking-wider">
+<span>Stage: PRD</span>
+<span>0%</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-outline h-full rounded-full" style="width: 0%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between mt-auto pt-3 border-t border-outline-variant/30">
+<button class="text-[10px] font-mono text-primary flex items-center gap-1 hover:brightness-110">
+<span class="material-symbols-outlined !text-xs" data-icon="play_arrow">play_arrow</span> START AGENT
+                        </button>
+</div>
+</div>
+<!-- Task Card: Running (Simulating) -->
+<div class="pipeline-card bg-surface-container-low border border-outline-variant p-4 transition-all flex flex-col gap-4 relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1 pr-12">
+<h3 class="text-sm font-semibold text-on-surface leading-snug">Implement Webhook retries</h3>
+<p class="text-[10px] font-mono text-on-surface-variant truncate tracking-tight">~/code/notifications · branch: bugfix/webhook</p>
+</div>
+<span class="absolute top-4 right-4 bg-primary text-on-primary text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 animate-pulse">
+<span class="material-symbols-outlined !text-[10px]" data-icon="sync" style="font-variation-settings: 'wght' 700;">sync</span>
+                            RUNNING
+                        </span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[9px] font-mono text-outline uppercase tracking-wider">
+<span>Stage: SIMULATING</span>
+<span>89%</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 89%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between mt-auto pt-3 border-t border-outline-variant/30">
+<div class="flex items-center gap-1 text-[10px] font-mono text-blue-400">
+<span class="material-symbols-outlined !text-xs" data-icon="visibility">visibility</span> Watching logs...
+                        </div>
+</div>
+</div>
+<!-- Task Card: Running (Plan) -->
+<div class="pipeline-card bg-surface-container-low border border-outline-variant p-4 transition-all flex flex-col gap-4 relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1 pr-12">
+<h3 class="text-sm font-semibold text-on-surface leading-snug">Audit dependencies (CVE-2024)</h3>
+<p class="text-[10px] font-mono text-on-surface-variant truncate tracking-tight">~/code/monorepo · branch: security/audit</p>
+</div>
+<span class="absolute top-4 right-4 bg-primary text-on-primary text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1 animate-pulse">
+<span class="material-symbols-outlined !text-[10px]" data-icon="sync" style="font-variation-settings: 'wght' 700;">sync</span>
+                            RUNNING
+                        </span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[9px] font-mono text-outline uppercase tracking-wider">
+<span>Stage: PLAN</span>
+<span>12%</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 12%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between mt-auto pt-3 border-t border-outline-variant/30">
+<div class="flex items-center gap-1 text-[10px] font-mono text-on-surface-variant italic">
+                            Agent: Claude-3.5-Sonnet
+                        </div>
+</div>
+</div>
+<!-- Task Card: Idle (Queued) -->
+<div class="pipeline-card bg-surface-container-low border border-outline-variant p-4 transition-all flex flex-col gap-4 relative group opacity-60">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1 pr-12">
+<h3 class="text-sm font-semibold text-on-surface leading-snug">Clean up legacy test suite</h3>
+<p class="text-[10px] font-mono text-on-surface-variant truncate tracking-tight">~/code/api-service · branch: refactor/tests</p>
+</div>
+<span class="absolute top-4 right-4 border border-outline text-outline text-[9px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+<span class="material-symbols-outlined !text-[10px]" data-icon="hourglass_empty" style="font-variation-settings: 'wght' 700;">hourglass_empty</span>
+                            QUEUED
+                        </span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-[9px] font-mono text-outline uppercase tracking-wider">
+<span>Stage: PRD</span>
+<span>0%</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden">
+<div class="bg-outline/20 h-full rounded-full" style="width: 0%"></div>
+</div>
+</div>
+<div class="flex items-center justify-between mt-auto pt-3 border-t border-outline-variant/30">
+<span class="text-[10px] font-mono text-outline">Priority: LOW</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Terminal Panel (Collapsible Mock) -->
+<div class="h-48 border-t border-outline-variant bg-surface-container-lowest font-mono p-4 overflow-hidden relative">
+<div class="flex items-center justify-between mb-2 pb-2 border-b border-outline-variant/20">
+<div class="flex items-center gap-4">
+<span class="text-xs font-bold text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined !text-xs" data-icon="terminal">terminal</span>
+                        STREAMING_LOGS: pipeline_id=px-994
+                    </span>
+<span class="text-[10px] text-green-500 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        LIVE
+                    </span>
+</div>
+<div class="flex gap-3">
+<span class="material-symbols-outlined !text-sm cursor-pointer text-outline hover:text-on-surface" data-icon="content_copy">content_copy</span>
+<span class="material-symbols-outlined !text-sm cursor-pointer text-outline hover:text-on-surface" data-icon="close">close</span>
+</div>
+</div>
+<div class="text-[10px] text-on-surface-variant space-y-1 custom-scrollbar overflow-y-auto h-32 leading-relaxed">
+<p><span class="text-primary-dim">[09:41:02]</span> Initializing agent <span class="text-on-surface">Claude-Code-v2</span> for task <span class="text-on-surface">"Refactor auth middleware"</span>...</p>
+<p><span class="text-primary-dim">[09:41:05]</span> Analyzing local worktree at <span class="text-on-surface">~/code/api-service</span></p>
+<p><span class="text-primary-dim">[09:41:08]</span> Building dependency graph... OK (142 nodes)</p>
+<p><span class="text-primary-dim">[09:41:12]</span> <span class="bg-primary/20 px-1 rounded">PLAN</span> Agent proposed 4 files for modification.</p>
+<p><span class="text-primary-dim">[09:41:15]</span> <span class="bg-primary/20 px-1 rounded">BUILD</span> Writing to <span class="text-on-surface">src/middleware/auth.go</span>...</p>
+<p><span class="text-primary-dim">[09:41:18]</span> <span class="bg-primary/20 px-1 rounded">BUILD</span> Writing to <span class="text-on-surface">src/tests/auth_test.go</span>...</p>
+<p class="animate-pulse text-primary"><span class="text-primary-dim">[09:41:22]</span> <span class="bg-primary/20 px-1 rounded">BUILD</span> Running 'go fmt ./...' _</p>
+</div>
+<div class="absolute bottom-4 right-6 pointer-events-none opacity-20">
+<span class="material-symbols-outlined !text-6xl text-primary" data-icon="settings_ethernet">settings_ethernet</span>
+</div>
+</div>
+</main>
+<!-- Mobile Bottom NavBar (JSON Authority Logic) -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-surface-container border-t border-outline-variant flex justify-around items-center px-2 z-50">
+<div class="flex flex-col items-center gap-1 text-primary cursor-pointer">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Pipeline</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-on-surface-variant cursor-pointer">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Logs</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-on-surface-variant cursor-pointer">
+<span class="material-symbols-outlined" data-icon="biotech">biotech</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Sim</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-on-surface-variant cursor-pointer">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Set</span>
+</div>
+</nav>
+<script>
+        // Micro-interaction: Update progress bars randomly for visual life
+        setInterval(() => {
+            const activeBars = document.querySelectorAll('.pipeline-card .bg-primary');
+            activeBars.forEach(bar => {
+                if(bar.parentElement.parentElement.innerText.includes('RUNNING')) {
+                   const currentWidth = parseFloat(bar.style.width);
+                   if (currentWidth < 98) {
+                       const newWidth = currentWidth + (Math.random() * 0.5);
+                       bar.style.width = newWidth + '%';
+                       bar.parentElement.previousElementSibling.lastElementChild.innerText = Math.floor(newWidth) + '%';
+                   }
+                }
+            });
+        }, 3000);
+
+        // Simple terminal typing effect mimic
+        const terminalLog = document.querySelector('.h-32');
+        setInterval(() => {
+            const newLog = document.createElement('p');
+            const now = new Date();
+            const timestamp = now.toTimeString().split(' ')[0];
+            newLog.innerHTML = `<span class="text-primary-dim">[${timestamp}]</span> Agent heart-beat signal received... <span class="text-green-500/50">OK</span>`;
+            terminalLog.appendChild(newLog);
+            terminalLog.scrollTop = terminalLog.scrollHeight;
+            if (terminalLog.children.length > 20) terminalLog.children[0].remove();
+        }, 15000);
+    </script>
+</body></html>
