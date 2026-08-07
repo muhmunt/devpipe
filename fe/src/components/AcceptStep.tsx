@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, Copy, GitMerge, Terminal } from 'lucide-react'
 import { api } from '@/lib/api'
 import { STATUS_PILL } from '@/lib/statusMeta'
+import StageActionBar from '@/components/StageActionBar'
 
 function suggestBranch(title: string) {
   const slug = title
@@ -76,15 +77,13 @@ export default function AcceptStep({
           </button>
         </div>
       </div>
-      <button
-        type="button"
+      <StageActionBar
+        turn={merging ? 'agent' : 'you'}
+        label={merging ? 'Merging…' : 'Accept and Merge'}
         onClick={accept}
         disabled={merging || !branch.trim()}
-        className="focus-ring w-full bg-primary hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground font-bold py-3 px-6 rounded transition-[filter,transform] duration-(--dur-short) ease-(--ease-out) active:scale-[0.99] flex items-center justify-center gap-2"
-      >
-        <GitMerge className="size-4" />
-        {merging ? 'Merging…' : 'Accept and Merge'}
-      </button>
+        icon={GitMerge}
+      />
 
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive whitespace-pre-wrap">
