@@ -14,3 +14,7 @@ be/*.exe
 # own node_modules/dist/etc.)
 .DS_Store
 *.local
+
+# subagent-driven-development scratch workspace (ledgers, briefs, review
+# packages) — not source, per-plan working state only.
+.superpowers/
