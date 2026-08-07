@@ -11,6 +11,7 @@ import BuildStep from '@/components/BuildStep'
 import BriefChat from '@/components/BriefChat'
 import AcceptStep from '@/components/AcceptStep'
 import CardChatSidebar from '@/components/CardChatSidebar'
+import StageActionBar from '@/components/StageActionBar'
 import { api } from '@/lib/api'
 import { STATUS_PILL } from '@/lib/statusMeta'
 import { STAGES, type Card, type RunStatus } from '@/lib/types'
@@ -262,14 +263,7 @@ export default function CardDetail() {
                             Plan approved. Ready to build. The technical specifications and agent constraints have been
                             verified. No pending blockers detected.
                           </p>
-                          <button
-                            type="button"
-                            onClick={() => advance('building')}
-                            className="focus-ring group flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded font-bold text-sm tracking-tight hover:brightness-110 transition-[filter,transform] duration-(--dur-short) ease-(--ease-out) active:scale-[0.98]"
-                          >
-                            <Zap className="size-4" />
-                            Start Build
-                          </button>
+                          <StageActionBar turn="you" label="Start Build" onClick={() => advance('building')} icon={Zap} />
                         </div>
                       )}
                       {isOpen && stage === 'deployed' && (

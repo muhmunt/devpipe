@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Circle, CircleDot, CheckCircle2, ChevronDown, ChevronRight, Eye, RefreshCw, Terminal, XCircle } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import StageActionBar from '@/components/StageActionBar'
 import { api } from '@/lib/api'
 import type { Run, StreamEvent, Task } from '@/lib/types'
 
@@ -171,20 +172,15 @@ export default function BuildStep({
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-3">
-        <button
-          type="button"
+      <div className="space-y-3">
+        <StageActionBar
+          turn={running ? 'agent' : 'you'}
+          label={running ? 'Running…' : hasPartialProgress ? 'Continue Build' : `Run ${stageLabel}`}
           onClick={start}
           disabled={running}
-          className={
-            running
-              ? 'focus-ring px-4 py-2 bg-primary/20 text-primary border border-primary/50 text-xs font-bold rounded flex items-center gap-2 opacity-80 cursor-wait'
-              : 'btn-interactive focus-ring px-4 py-2 bg-primary text-primary-foreground border border-transparent text-xs font-bold rounded flex items-center gap-2 hover:opacity-90'
-          }
-        >
-          {running && <RefreshCw className="size-3.5 animate-spin" />}
-          {running ? 'Running…' : hasPartialProgress ? 'Continue Build' : `Run ${stageLabel}`}
-        </button>
+          icon={RefreshCw}
+          spinning={running}
+        />
 
         <Dialog open={diffOpen} onOpenChange={setDiffOpen}>
           <DialogTrigger asChild>
