@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Check, ChevronRight, Lock, MessageSquare, Zap } from 'lucide-react'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
@@ -125,6 +125,13 @@ export default function CardDetail() {
   // so a chat-driven plan revision forces PlanStep to reload its task list.
   // Referenced here so noUnusedLocals doesn't flag it before that call site exists.
   void planRevisionTick
+
+  // Stable identities so CardChatSidebar's SSE useEffect (which depends on
+  // these callbacks) doesn't tear down and reopen the EventSource on every
+  // CardDetail re-render — an inline arrow here would get a fresh identity
+  // each render and risk dropping in-flight chat_delta/chat_done events.
+  const handleDocRevised = useCallback((content: string) => setPrdDraftContent(content), [])
+  const handlePlanRevised = useCallback(() => setPlanRevisionTick((t) => t + 1), [])
 
   const load = () => {
     if (!id) return
@@ -311,8 +318,8 @@ export default function CardDetail() {
             cardTitle={card.title}
             scope={chatScope}
             prdContent={prdDraftContent}
-            onDocRevised={setPrdDraftContent}
-            onPlanRevised={() => setPlanRevisionTick((t) => t + 1)}
+            onDocRevised={handleDocRevised}
+            onPlanRevised={handlePlanRevised}
           />
         </div>
       </div>
@@ -333,8 +340,8 @@ export default function CardDetail() {
             cardTitle={card.title}
             scope={chatScope}
             prdContent={prdDraftContent}
-            onDocRevised={setPrdDraftContent}
-            onPlanRevised={() => setPlanRevisionTick((t) => t + 1)}
+            onDocRevised={handleDocRevised}
+            onPlanRevised={handlePlanRevised}
           />
         </SheetContent>
       </Sheet>
