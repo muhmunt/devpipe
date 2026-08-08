@@ -9,7 +9,7 @@ import PlanStep from '@/components/PlanStep'
 import DraftSwitcher from '@/components/DraftSwitcher'
 import BuildStep from '@/components/BuildStep'
 import AcceptStep from '@/components/AcceptStep'
-import CardChatSidebar, { type ChatScope } from '@/components/CardChatSidebar'
+import CardChatSidebar, { type ChatScope, GENERAL_SCOPE } from '@/components/CardChatSidebar'
 import StageActionBar from '@/components/StageActionBar'
 import { api } from '@/lib/api'
 import { STATUS_PILL } from '@/lib/statusMeta'
@@ -41,8 +41,7 @@ const CHAT_EMPTY_HINTS: Record<string, string> = {
   prd: "Chat with the agent to draft this — describe what you want, it'll write the doc below.",
   plan: 'e.g. "combine steps 2 and 3" or "add a step for tests".',
   simulating:
-    'Describe the simulation — actor/login, endpoints, expected results… Run Simulate below uses whatever you land on here.',
-  general: 'Ask the agent anything about this card.',
+    'Chat first to describe the scenario — e.g. "log in as the seeded test user, then GET /api/orders with that token, expect a 200 with a non-empty array." Run Simulate below uses whatever you land on here.',
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -148,9 +147,9 @@ export default function CardDetail() {
   useEffect(load, [id])
 
   useEffect(() => {
-    if (!card?.activePrdId) return
+    if (openStage !== 'prd' || !card?.activePrdId) return
     api.getPRD(card.id, card.activePrdId).then((prd) => setPrdDraftContent(prd.content))
-  }, [card?.activePrdId])
+  }, [card?.id, card?.activePrdId, openStage])
 
   if (!card)
     return (
@@ -168,7 +167,7 @@ export default function CardDetail() {
         ? { stage: 'plan', docId: card.activePlanId, label: 'Plan draft', emptyHint: CHAT_EMPTY_HINTS.plan }
         : openStage === 'simulating'
           ? { stage: 'simulating', docId: null, label: 'Simulate brief', emptyHint: CHAT_EMPTY_HINTS.simulating }
-          : { stage: 'general', docId: null, label: 'General', emptyHint: CHAT_EMPTY_HINTS.general }
+          : GENERAL_SCOPE
 
   const advance = async (stage: (typeof STAGES)[number]) => {
     if (!id) return

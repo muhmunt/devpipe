@@ -172,65 +172,63 @@ export default function BuildStep({
 
   return (
     <div className="space-y-3">
-      <div className="space-y-3">
-        <StageActionBar
-          turn={running ? 'agent' : 'you'}
-          label={running ? 'Running…' : hasPartialProgress ? 'Continue Build' : `Run ${stageLabel}`}
-          onClick={start}
-          disabled={running}
-          icon={RefreshCw}
-          spinning={running}
-        />
+      <StageActionBar
+        turn={running ? 'agent' : 'you'}
+        label={running ? 'Running…' : hasPartialProgress ? 'Continue Build' : `Run ${stageLabel}`}
+        onClick={start}
+        disabled={running}
+        icon={RefreshCw}
+        spinning={running}
+      />
 
-        <Dialog open={diffOpen} onOpenChange={setDiffOpen}>
-          <DialogTrigger asChild>
-            <button
-              type="button"
-              disabled={diffs.length === 0}
-              className="btn-interactive focus-ring px-4 py-2 border border-border text-muted-foreground hover:text-foreground hover:border-ring disabled:opacity-40 text-xs font-bold rounded flex items-center gap-2"
-            >
-              <Eye className="size-3.5" />
-              View changes {diffs.length > 0 ? `(${diffs.length})` : ''}
-            </button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Changed files — {stageLabel}</DialogTitle>
-            </DialogHeader>
-            <div className="border border-border rounded-md divide-y divide-border">
-              {diffs.map((d) => {
-                const stat = diffStat(d.diff)
-                return (
-                <div key={d.file}>
-                  <button
-                    className="w-full flex items-center justify-between text-left px-3 py-2 text-sm font-mono hover:bg-muted/50"
-                    onClick={() => setExpanded(expanded === d.file ? null : d.file)}
-                  >
-                    <span>{d.file}</span>
-                    <span className="text-xs shrink-0 ml-2">
-                      <span className="text-green-600">+{stat.add}</span>{' '}
-                      <span className="text-red-600">−{stat.del}</span>
-                    </span>
-                  </button>
-                  {expanded === d.file && (
-                    <pre className="text-xs p-3 overflow-x-auto bg-muted">
-                      {d.diff.split('\n').map((l, i) => (
-                        <div
-                          key={i}
-                          className={l.startsWith('+') ? 'text-green-600' : l.startsWith('-') ? 'text-red-600' : ''}
-                        >
-                          {l}
-                        </div>
-                      ))}
-                    </pre>
-                  )}
-                </div>
-                )
-              })}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+      <Dialog open={diffOpen} onOpenChange={setDiffOpen}>
+        <DialogTrigger asChild>
+          <button
+            type="button"
+            disabled={diffs.length === 0}
+            className="btn-interactive focus-ring px-4 py-2 border border-border text-muted-foreground hover:text-foreground hover:border-ring disabled:opacity-40 text-xs font-bold rounded flex items-center gap-2"
+          >
+            <Eye className="size-3.5" />
+            View changes {diffs.length > 0 ? `(${diffs.length})` : ''}
+          </button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Changed files — {stageLabel}</DialogTitle>
+          </DialogHeader>
+          <div className="border border-border rounded-md divide-y divide-border">
+            {diffs.map((d) => {
+              const stat = diffStat(d.diff)
+              return (
+              <div key={d.file}>
+                <button
+                  className="w-full flex items-center justify-between text-left px-3 py-2 text-sm font-mono hover:bg-muted/50"
+                  onClick={() => setExpanded(expanded === d.file ? null : d.file)}
+                >
+                  <span>{d.file}</span>
+                  <span className="text-xs shrink-0 ml-2">
+                    <span className="text-green-600">+{stat.add}</span>{' '}
+                    <span className="text-red-600">−{stat.del}</span>
+                  </span>
+                </button>
+                {expanded === d.file && (
+                  <pre className="text-xs p-3 overflow-x-auto bg-muted">
+                    {d.diff.split('\n').map((l, i) => (
+                      <div
+                        key={i}
+                        className={l.startsWith('+') ? 'text-green-600' : l.startsWith('-') ? 'text-red-600' : ''}
+                      >
+                        {l}
+                      </div>
+                    ))}
+                  </pre>
+                )}
+              </div>
+              )
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">

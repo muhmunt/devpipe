@@ -127,7 +127,7 @@ export default function ChatStep({
       {diagramError && <p className="text-sm text-destructive">{diagramError}</p>}
 
       <StageActionBar
-        turn="you"
+        turn={saving ? 'agent' : 'you'}
         label={saving ? 'Saving…' : continueLabel}
         onClick={saveAndContinue}
         disabled={!content.trim() || saving}

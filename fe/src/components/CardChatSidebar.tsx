@@ -11,7 +11,7 @@ export type ChatScope = {
   emptyHint: string
 }
 
-const GENERAL_SCOPE: ChatScope = {
+export const GENERAL_SCOPE: ChatScope = {
   stage: 'general',
   docId: null,
   label: 'General',
@@ -76,6 +76,8 @@ export default function CardChatSidebar({
     (effectiveScope.stage === 'prd' || effectiveScope.stage === 'plan') && !effectiveScope.docId
 
   useEffect(() => {
+    setStreaming(null)
+    setError(null)
     if (scopeUnavailable) {
       setMessages([])
       return
@@ -143,8 +145,13 @@ export default function CardChatSidebar({
     setStreaming('')
     const message = input
     setInput('')
-    const currentDoc = await buildCurrentDoc()
-    await api.sendChat(cardId, stage, message, currentDoc, docId ?? undefined)
+    try {
+      const currentDoc = await buildCurrentDoc()
+      await api.sendChat(cardId, stage, message, currentDoc, docId ?? undefined)
+    } catch (e) {
+      setStreaming(null)
+      setError(e instanceof Error ? e.message : String(e))
+    }
   }
 
   const loading = streaming !== null
@@ -169,7 +176,7 @@ export default function CardChatSidebar({
       <div ref={transcriptRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {scopeUnavailable && (
           <p className="text-sm text-muted-foreground">
-            Create a {effectiveScope.label.toLowerCase()} to start chatting — use the draft picker above.
+            Create a {effectiveScope.label.toLowerCase()} to start chatting — use the draft picker in the stage panel.
           </p>
         )}
         {!scopeUnavailable && messages.length === 0 && !loading && (
