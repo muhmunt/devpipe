@@ -87,6 +87,7 @@ export const api = {
     request<RunsWithArtifacts>(`/cards/${cardId}/runs?stage=${encodeURIComponent(stage)}`),
   getRecentRuns: (limit = 100) => request<RunWithCard[]>(`/runs/recent?limit=${limit}`),
   streamUrl: (cardId: string) => `${API_BASE}/cards/${cardId}/stream`,
+  streamAllUrl: () => `${API_BASE}/stream`,
   accept: (cardId: string, branch: string) =>
     request<{ card: Card; mergeOutput: string }>(`/cards/${cardId}/accept`, {
       method: 'POST',

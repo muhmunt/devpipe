@@ -108,12 +108,24 @@ export type PlanWithTasks = {
 }
 
 export type StreamEvent = {
-  type: 'log' | 'log_delta' | 'diff' | 'stage' | 'done' | 'error' | 'chat' | 'chat_delta' | 'chat_done' | 'task'
+  type:
+    | 'log'
+    | 'log_delta'
+    | 'diff'
+    | 'stage'
+    | 'done'
+    | 'error'
+    | 'chat'
+    | 'chat_delta'
+    | 'chat_done'
+    | 'task'
+    | 'card_status'
   stage?: string
   line?: string
   file?: string
   diff?: string
   data?: string
+  cardId?: string
 }
 
 export type ChatMessage = {

@@ -1,7 +1,10 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Cpu, FileText, FlaskConical, Terminal, Workflow } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
+import ActiveCardsRail from '@/components/ActiveCardsRail'
+import { api } from '@/lib/api'
+import type { Card, StreamEvent } from '@/lib/types'
 
 const NAV_ITEMS = [
   { label: 'Pipeline', icon: Workflow, to: '/' },
@@ -15,6 +18,22 @@ const NAV_ITEMS = [
 export default function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
 
+  const [cards, setCards] = useState<Card[]>([])
+
+  useEffect(() => {
+    api.listCards().then(setCards).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const es = new EventSource(api.streamAllUrl())
+    es.onmessage = (e) => {
+      const ev = JSON.parse(e.data) as StreamEvent
+      if (ev.type !== 'card_status') return
+      api.listCards().then(setCards).catch(() => {})
+    }
+    return () => es.close()
+  }, [])
+
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <aside className="hidden md:flex flex-col h-full py-4 w-64 shrink-0 bg-card border-r border-border">
@@ -22,7 +41,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <Terminal className="size-5 text-primary" />
           <span className="text-lg font-headline font-bold">DEVPIPE_ROOT</span>
         </div>
-        <nav className="flex-1 space-y-1 px-3">
+        <nav className="space-y-1 px-3">
           {NAV_ITEMS.map(({ label, icon: Icon, to }) => {
             const active = to === location.pathname
             return (
@@ -41,6 +60,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
             )
           })}
         </nav>
+        <div className="flex-1 overflow-y-auto">
+          <ActiveCardsRail cards={cards} />
+        </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
