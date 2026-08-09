@@ -1,0 +1,17 @@
+[package]
+name = "devpipe-rust"
+version = "0.0.1"
+edition = "2021"
+
+[[bin]]
+name = "devpipe-rust"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = "0.7"
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
