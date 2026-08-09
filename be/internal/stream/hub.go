@@ -6,13 +6,19 @@ import (
 )
 
 type Event struct {
-	Type  string `json:"type"` // "log" | "diff" | "stage" | "done" | "error" | "chat" | "chat_done"
-	Stage string `json:"stage,omitempty"`
-	Line  string `json:"line,omitempty"`
-	File  string `json:"file,omitempty"`
-	Diff  string `json:"diff,omitempty"`
-	Data  string `json:"data,omitempty"`
+	Type   string `json:"type"` // "log" | "diff" | "stage" | "done" | "error" | "chat" | "chat_done" | "card_status"
+	Stage  string `json:"stage,omitempty"`
+	Line   string `json:"line,omitempty"`
+	File   string `json:"file,omitempty"`
+	Diff   string `json:"diff,omitempty"`
+	Data   string `json:"data,omitempty"`
+	CardID string `json:"cardId,omitempty"` // set on "card_status" events published to GlobalTopic
 }
+
+// GlobalTopic is the reserved Hub key for app-wide events (currently just
+// "card_status") that aren't scoped to one card's own stream — subscribed
+// to via GET /api/stream, separate from the per-card /cards/{id}/stream.
+const GlobalTopic = "__global__"
 
 type Hub struct {
 	mu   sync.Mutex
