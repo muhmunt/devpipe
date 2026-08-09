@@ -77,6 +77,7 @@ func (h *BuildHandler) run(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.Hub.Publish(stream.GlobalTopic, stream.Event{Type: "card_status", CardID: cardID, Stage: card.Stage, Data: "running"})
 
 	go h.execute(context.Background(), card)
 
@@ -126,6 +127,7 @@ func (h *BuildHandler) execute(ctx context.Context, card *db.Card) {
 	}
 	h.Hub.Publish(cardID, stream.Event{Type: "stage", Stage: card.Stage, Data: next})
 	h.Hub.Publish(cardID, stream.Event{Type: "done", Stage: card.Stage})
+	h.Hub.Publish(stream.GlobalTopic, stream.Event{Type: "card_status", CardID: cardID, Stage: next, Data: "idle"})
 }
 
 // resolvePrompt lets the user chat-refine a stage's execution instructions
@@ -280,4 +282,5 @@ func (h *BuildHandler) fail(ctx context.Context, card *db.Card, msg string) {
 	log.Printf("build failed for card %s: %s", card.ID, msg)
 	_ = h.Cards.UpdateStage(ctx, card.ID, card.Stage, "failed")
 	h.Hub.Publish(card.ID, stream.Event{Type: "error", Stage: card.Stage, Data: msg})
+	h.Hub.Publish(stream.GlobalTopic, stream.Event{Type: "card_status", CardID: card.ID, Stage: card.Stage, Data: "failed"})
 }

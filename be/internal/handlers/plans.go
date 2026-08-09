@@ -175,6 +175,7 @@ func (h *PlanHandler) generate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.Hub.Publish(stream.GlobalTopic, stream.Event{Type: "card_status", CardID: cardID, Stage: "plan", Data: "success"})
 
 	h.Hub.Publish(cardID, stream.Event{Type: "done", Stage: "plan"})
 	h.respondWithPlan(w, r, plan)
@@ -317,6 +318,7 @@ func (h *PlanHandler) approve(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		h.Hub.Publish(stream.GlobalTopic, stream.Event{Type: "card_status", CardID: cardID, Stage: "approved", Data: "idle"})
 	}
 	plan.Status = "approved"
 	h.respondWithPlan(w, r, plan)

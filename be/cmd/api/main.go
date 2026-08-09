@@ -44,7 +44,7 @@ func main() {
 	chatStore := db.NewChatStore(pool)
 	hub := stream.NewHub()
 
-	cardHandler := &handlers.CardHandler{Store: cardStore}
+	cardHandler := &handlers.CardHandler{Store: cardStore, Hub: hub}
 	agentHandler := &handlers.AgentHandler{}
 	prdHandler := &handlers.PRDHandler{Store: prdStore, Cards: cardStore}
 	planHandler := &handlers.PlanHandler{Cards: cardStore, PRDs: prdStore, Plans: planStore, Tasks: taskStore, Hub: hub}

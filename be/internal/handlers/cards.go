@@ -11,11 +11,13 @@ import (
 	"github.com/google/uuid"
 
 	"devpipe/be/internal/db"
+	"devpipe/be/internal/stream"
 	"devpipe/be/internal/worktree"
 )
 
 type CardHandler struct {
 	Store *db.CardStore
+	Hub   *stream.Hub
 }
 
 func (h *CardHandler) Routes(r chi.Router) {
@@ -149,6 +151,7 @@ func (h *CardHandler) updateStage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.Hub.Publish(stream.GlobalTopic, stream.Event{Type: "card_status", CardID: id, Stage: req.Stage, Data: req.Status})
 	card, err := h.Store.Get(r.Context(), id)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
@@ -206,6 +209,7 @@ func (h *CardHandler) accept(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.Hub.Publish(stream.GlobalTopic, stream.Event{Type: "card_status", CardID: id, Stage: "deployed", Data: "success"})
 	card, err = h.Store.Get(ctx, id)
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)
