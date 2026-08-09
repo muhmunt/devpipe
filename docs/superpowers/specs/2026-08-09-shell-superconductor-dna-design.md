@@ -115,8 +115,20 @@ CardStore.UpdateStage succeeds (7 call sites)
   → ActiveCardsRail + header count-pill both re-render from the refreshed list
 ```
 
-`AppShell` wraps every page, so the rail and count-pill stay live across
-navigation without any individual page needing to know about this.
+**Correction found during planning:** `AppShell` is not a single wrapper
+around the router — each of the 8 page components individually renders its
+own `<AppShell>` instance (`App.tsx` swaps whole page components via
+`<Route element={<Board />} />` etc.), so `AppShell` actually **remounts on
+every navigation**, not once per app session. In practice this means the
+`EventSource` reconnects on every page change rather than staying open for
+the app's lifetime — functionally fine (cheap to reopen, `card_status`
+events are human-paced, not high-frequency) but the rail/count-pill are
+live only while a page is mounted, not literally always-connected.
+Restructuring to a single outer shell (App.tsx wraps one `<AppShell>`,
+pages render only their content) would fix this properly but touches all 8
+page files — out of scope for this plan per its own scoping (shared chrome
++ new rail component only). Noting as a known, accepted limitation rather
+than silently working around it.
 
 ### Error handling
 
