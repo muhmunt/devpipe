@@ -28,11 +28,17 @@ pub async fn list_cards(State(pool): State<PgPool>) -> Result<Json<Vec<Card>>, (
 
 pub async fn create_card(
     State(pool): State<PgPool>,
-    Json(req): Json<CreateCardRequest>,
-) -> Result<Json<Card>, (StatusCode, String)> {
+    Json(mut req): Json<CreateCardRequest>,
+) -> Result<(StatusCode, Json<Card>), (StatusCode, String)> {
+    if req.title.is_empty() || req.repo_path.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "title and repoPath required".to_string()));
+    }
+    if req.agent.is_empty() {
+        req.agent = "claude".to_string();
+    }
     db::create_card(&pool, &req.title, &req.repo_path, &req.agent)
         .await
-        .map(Json)
+        .map(|card| (StatusCode::CREATED, Json(card)))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 

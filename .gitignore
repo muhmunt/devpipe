@@ -10,6 +10,9 @@ be/bin/
 be/api
 be/*.exe
 
+# Rust build artifacts
+be-rust/target/
+
 # OS / editor cruft at the repo root (fe/ has its own .gitignore for its
 # own node_modules/dist/etc.)
 .DS_Store

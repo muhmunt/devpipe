@@ -97,15 +97,12 @@ pub async fn create_card(
         .execute(&mut *tx)
         .await?;
 
-    sqlx::query("UPDATE cards SET active_prd_id = $2, updated_at = now() WHERE id = $1")
-        .bind(&card_id)
-        .bind(&prd_id)
-        .execute(&mut *tx)
-        .await?;
-
-    let query = format!("SELECT {CARD_COLUMNS} FROM cards WHERE id = $1");
+    let query = format!(
+        "UPDATE cards SET active_prd_id = $2, updated_at = now() WHERE id = $1 RETURNING {CARD_COLUMNS}"
+    );
     let card = sqlx::query_as::<_, Card>(&query)
         .bind(&card_id)
+        .bind(&prd_id)
         .fetch_one(&mut *tx)
         .await?;
 
