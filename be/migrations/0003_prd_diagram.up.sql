@@ -1,1 +1,0 @@
-ALTER TABLE prds ADD COLUMN diagram TEXT;

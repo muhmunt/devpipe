@@ -1,1 +1,0 @@
-ALTER TABLE prds DROP COLUMN diagram;

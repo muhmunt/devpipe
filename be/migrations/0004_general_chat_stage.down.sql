@@ -1,3 +1,0 @@
--- Postgres has no ALTER TYPE ... DROP VALUE; removing an enum value means
--- recreating the type and re-pointing every dependent column. Not worth it
--- for a revert path — 'general' simply remains a valid, unused stage value.

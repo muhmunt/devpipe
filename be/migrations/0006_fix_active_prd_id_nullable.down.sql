@@ -1,1 +1,0 @@
-ALTER TABLE cards ALTER COLUMN active_prd_id SET NOT NULL;
