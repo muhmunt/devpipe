@@ -15,6 +15,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/workspaces/:id", get(get_workspace))
         .route("/workspaces/:id/repositories", get(list_repositories))
         .route("/repositories", post(create_repository))
+        .route("/repositories/clone", post(clone_repository))
         .route("/repositories/:id", get(get_repository).patch(update_repository_scripts))
         .route("/repositories/:id/worktrees", get(list_worktrees).post(create_worktree))
         .route("/worktrees/:id", get(get_worktree).delete(delete_worktree))
@@ -152,7 +153,14 @@ async fn create_repository(
     State(pool): State<PgPool>,
     Json(body): Json<CreateRepositoryBody>,
 ) -> Result<Json<Repository>, AppError> {
-    crate::git::validate_path(std::path::Path::new(&body.local_path))?;
+    let path = std::path::Path::new(&body.local_path);
+    crate::git::validate_path(path)?;
+    if !path.exists() {
+        return Err(AppError::Invalid(format!("path does not exist: {}", body.local_path)));
+    }
+    if !crate::git::is_git_repo(path).await {
+        return Err(AppError::Invalid(format!("not a git repository: {}", body.local_path)));
+    }
     let id = Uuid::new_v4();
     let now = Utc::now();
     let default_branch = body.default_branch.unwrap_or_else(|| "main".to_string());
@@ -181,6 +189,42 @@ async fn get_repository(
         .fetch_optional(&pool)
         .await?
         .ok_or(AppError::NotFound)?;
+    Ok(Json(repository_from_row(&row)))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CloneRepositoryBody {
+    workspace_id: Uuid,
+    name: String,
+    clone_url: String,
+    dest_path: String,
+    default_branch: Option<String>,
+}
+
+async fn clone_repository(
+    State(pool): State<PgPool>,
+    Json(body): Json<CloneRepositoryBody>,
+) -> Result<Json<Repository>, AppError> {
+    let dest = std::path::Path::new(&body.dest_path);
+    crate::git::clone(&body.clone_url, dest).await?;
+
+    let id = Uuid::new_v4();
+    let now = Utc::now();
+    let default_branch = body.default_branch.unwrap_or_else(|| "main".to_string());
+    let row = sqlx::query(
+        "INSERT INTO repositories (id, workspace_id, name, local_path, remote_url, default_branch, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING *",
+    )
+    .bind(id)
+    .bind(body.workspace_id)
+    .bind(&body.name)
+    .bind(&body.dest_path)
+    .bind(&body.clone_url)
+    .bind(&default_branch)
+    .bind(now)
+    .fetch_one(&pool)
+    .await?;
     Ok(Json(repository_from_row(&row)))
 }
 

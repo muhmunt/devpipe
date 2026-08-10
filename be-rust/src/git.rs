@@ -31,6 +31,47 @@ pub fn validate_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// `git clone <url> <dest>`. No leading-dash / no shell string — same argv
+/// safety pattern as everything else in this module. Runs without `-C`
+/// since the destination doesn't exist yet.
+pub async fn clone(url: &str, dest: &Path) -> Result<()> {
+    validate_path(dest)?;
+    if url.is_empty() || url.starts_with('-') {
+        return Err(DomainError::Invalid(format!("invalid clone url: {url}")));
+    }
+    if dest.exists() {
+        return Err(DomainError::Conflict(format!("destination already exists: {}", dest.display())));
+    }
+    let dest_str = dest.to_str().ok_or_else(|| DomainError::Invalid("non-utf8 path".into()))?;
+    let output = Command::new("git")
+        .args(["clone", url, dest_str])
+        .output()
+        .await
+        .map_err(DomainError::Io)?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let detail = if !stderr.trim().is_empty() { stderr.trim() } else { stdout.trim() };
+        return Err(DomainError::Invalid(format!("git clone failed: {detail}")));
+    }
+    Ok(())
+}
+
+/// Used by the "Open Folder" flow — fail fast with a clear error at
+/// creation time instead of a confusing failure the first time some other
+/// git operation runs against a non-repo path.
+pub async fn is_git_repo(path: &Path) -> bool {
+    Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .await
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
 async fn run_git(cwd: &Path, args: &[&str]) -> Result<String> {
     let output = Command::new("git")
         .arg("-C")
