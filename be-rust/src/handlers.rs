@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::domain::{AgentDefinition, Repository, Worktree, WorktreeKind, WorktreeStatus, Workspace};
 use crate::error::AppError;
 
-pub fn routes() -> Router<PgPool> {
+pub fn routes() -> Router<crate::state::AppState> {
     Router::new()
         .route("/workspaces", get(list_workspaces).post(create_workspace))
         .route("/workspaces/:id", get(get_workspace))
@@ -36,7 +36,7 @@ fn workspace_from_row(row: &sqlx::postgres::PgRow) -> Workspace {
     }
 }
 
-fn repository_from_row(row: &sqlx::postgres::PgRow) -> Repository {
+pub(crate) fn repository_from_row(row: &sqlx::postgres::PgRow) -> Repository {
     Repository {
         id: row.get("id"),
         workspace_id: row.get("workspace_id"),
@@ -53,7 +53,7 @@ fn repository_from_row(row: &sqlx::postgres::PgRow) -> Repository {
     }
 }
 
-fn worktree_from_row(row: &sqlx::postgres::PgRow) -> Result<Worktree, AppError> {
+pub(crate) fn worktree_from_row(row: &sqlx::postgres::PgRow) -> Result<Worktree, AppError> {
     let kind: String = row.get("kind");
     let status: String = row.get("status");
     Ok(Worktree {
@@ -179,7 +179,7 @@ async fn get_repository(
 
 // --- worktrees ----------------------------------------------------------
 
-async fn fetch_repository(pool: &PgPool, id: Uuid) -> Result<Repository, AppError> {
+pub(crate) async fn fetch_repository(pool: &PgPool, id: Uuid) -> Result<Repository, AppError> {
     let row = sqlx::query("SELECT * FROM repositories WHERE id = $1")
         .bind(id)
         .fetch_optional(pool)
@@ -188,7 +188,7 @@ async fn fetch_repository(pool: &PgPool, id: Uuid) -> Result<Repository, AppErro
     Ok(repository_from_row(&row))
 }
 
-async fn fetch_worktree(pool: &PgPool, id: Uuid) -> Result<Worktree, AppError> {
+pub(crate) async fn fetch_worktree(pool: &PgPool, id: Uuid) -> Result<Worktree, AppError> {
     let row = sqlx::query("SELECT * FROM worktrees WHERE id = $1")
         .bind(id)
         .fetch_optional(pool)
@@ -273,7 +273,7 @@ async fn diff_worktree(
 
 // --- agent definitions + detection (Rung 4 / phase-r3, phase-r9.2/9.3) ---
 
-fn agent_definition_from_row(row: &sqlx::postgres::PgRow) -> AgentDefinition {
+pub(crate) fn agent_definition_from_row(row: &sqlx::postgres::PgRow) -> AgentDefinition {
     let default_args: sqlx::types::Json<Vec<String>> = row.get("default_args");
     AgentDefinition {
         id: row.get("id"),

@@ -123,7 +123,7 @@ impl AgentAdapter for ClaudeAdapter {
             args.push("--model".to_string());
             args.push(model.clone());
         }
-        args.push("start this task".to_string()); // real prompt supplied by caller before this lands in Rung 5
+        args.push(cfg.prompt.clone());
         spawn_and_stream(self.pm.clone(), cfg.session_id, "claude", args, cfg.worktree_path).await
     }
 }
@@ -146,7 +146,7 @@ impl AgentAdapter for CursorAdapter {
             args.push("--model".to_string());
             args.push(model.clone());
         }
-        args.push("start this task".to_string());
+        args.push(cfg.prompt.clone());
         spawn_and_stream(self.pm.clone(), cfg.session_id, "cursor-agent", args, cfg.worktree_path).await
     }
 }
@@ -161,8 +161,8 @@ pub struct CustomCliAdapter {
     pub pm: Arc<ProcessManager>,
 }
 
-fn substitute_template(arg: &str, worktree_path: &std::path::Path) -> String {
-    arg.replace("{worktree}", &worktree_path.to_string_lossy())
+fn substitute_template(arg: &str, worktree_path: &std::path::Path, prompt: &str) -> String {
+    arg.replace("{worktree}", &worktree_path.to_string_lossy()).replace("{prompt}", prompt)
 }
 
 #[async_trait]
@@ -174,7 +174,8 @@ impl AgentAdapter for CustomCliAdapter {
         Ok(detect_executable(&self.executable).await)
     }
     async fn start(&self, cfg: StartConfig) -> Result<Box<dyn SessionHandle>> {
-        let args: Vec<String> = self.default_args.iter().map(|a| substitute_template(a, &cfg.worktree_path)).collect();
+        let args: Vec<String> =
+            self.default_args.iter().map(|a| substitute_template(a, &cfg.worktree_path, &cfg.prompt)).collect();
         spawn_and_stream(self.pm.clone(), cfg.session_id, &self.executable, args, cfg.worktree_path).await
     }
 }
@@ -195,7 +196,7 @@ mod tests {
         };
         let session_id = Uuid::new_v4();
         let handle = adapter
-            .start(StartConfig { session_id, worktree_path: std::env::temp_dir(), model: None, reasoning_level: None })
+            .start(StartConfig { session_id, worktree_path: std::env::temp_dir(), model: None, reasoning_level: None, prompt: "test prompt".into() })
             .await
             .expect("start should succeed");
 
@@ -232,7 +233,7 @@ mod tests {
         };
         let session_id = Uuid::new_v4();
         let handle = adapter
-            .start(StartConfig { session_id, worktree_path: std::env::temp_dir(), model: None, reasoning_level: None })
+            .start(StartConfig { session_id, worktree_path: std::env::temp_dir(), model: None, reasoning_level: None, prompt: "test prompt".into() })
             .await
             .expect("start should succeed");
 

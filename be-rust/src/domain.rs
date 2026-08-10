@@ -251,6 +251,7 @@ pub struct StartConfig {
     pub worktree_path: PathBuf,
     pub model: Option<String>,
     pub reasoning_level: Option<String>,
+    pub prompt: String,
 }
 
 #[async_trait]
