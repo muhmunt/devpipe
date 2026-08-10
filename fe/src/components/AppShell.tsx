@@ -31,18 +31,19 @@ export function AppShell({
     <div className="h-full grid grid-rows-[1fr_auto] bg-background text-text">
       <div className={`grid min-h-0 ${rightPanel ? 'grid-cols-[auto_1fr_280px]' : 'grid-cols-[auto_1fr]'}`}>
         <aside
-          className={`border-r border-border bg-surface flex flex-col transition-[width] ${
+          className={`mac-vibrancy border-r border-border flex flex-col transition-[width] duration-200 ${
             collapsed ? 'w-0 overflow-hidden' : 'w-[240px]'
           }`}
+          style={{ transitionTimingFunction: 'var(--ease-out)' }}
         >
           <Sidebar />
         </aside>
         <div className="grid grid-rows-[36px_32px_1fr] min-w-0">
-          <div className="flex items-center justify-between border-b border-border px-3">
+          <div className="mac-vibrancy flex items-center justify-between border-b border-border px-3">
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="text-text-muted hover:text-text"
+              className="text-text-muted hover:text-text transition-colors"
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {collapsed ? <PanelLeft size={15} /> : <PanelLeftClose size={15} />}
@@ -52,9 +53,11 @@ export function AppShell({
           <TabStrip />
           <main className="min-w-0 min-h-0 overflow-auto">{children}</main>
         </div>
-        {rightPanel && <aside className="border-l border-border bg-surface overflow-y-auto">{rightPanel}</aside>}
+        {rightPanel && <aside className="mac-vibrancy border-l border-border overflow-y-auto">{rightPanel}</aside>}
       </div>
-      {statusBar && <div className="h-[28px] border-t border-border bg-surface flex items-center px-3 text-xs">{statusBar}</div>}
+      {statusBar && (
+        <div className="mac-vibrancy h-[28px] border-t border-border flex items-center px-3 text-xs">{statusBar}</div>
+      )}
     </div>
   )
 }

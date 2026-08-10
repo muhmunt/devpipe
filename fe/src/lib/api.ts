@@ -37,6 +37,8 @@ export const api = {
   listRepositories: (workspaceId: string) => request<Repository[]>(`/workspaces/${workspaceId}/repositories`),
   createRepository: (body: { workspaceId: string; name: string; localPath: string; remoteUrl?: string; defaultBranch?: string }) =>
     request<Repository>('/repositories', { method: 'POST', body: JSON.stringify(body) }),
+  cloneRepository: (body: { workspaceId: string; name: string; cloneUrl: string; destPath: string; defaultBranch?: string }) =>
+    request<Repository>('/repositories/clone', { method: 'POST', body: JSON.stringify(body) }),
   getRepository: (id: string) => request<Repository>(`/repositories/${id}`),
   updateRepositoryScripts: (
     id: string,
