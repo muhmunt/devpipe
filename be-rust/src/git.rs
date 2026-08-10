@@ -41,11 +41,13 @@ async fn run_git(cwd: &Path, args: &[&str]) -> Result<String> {
         .map_err(DomainError::Io)?;
 
     if !output.status.success() {
-        return Err(DomainError::Invalid(format!(
-            "git {} failed: {}",
-            args.join(" "),
-            String::from_utf8_lossy(&output.stderr)
-        )));
+        // Some git subcommands (e.g. `commit` with nothing staged) report
+        // the actual reason on stdout, not stderr — include both so the
+        // error is never silently empty.
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let detail = if !stderr.trim().is_empty() { stderr.trim() } else { stdout.trim() };
+        return Err(DomainError::Invalid(format!("git {} failed: {}", args.join(" "), detail)));
     }
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
@@ -158,4 +160,28 @@ pub async fn diff(worktree_path: &Path, target_branch: &str) -> Result<Diff> {
     }
 
     Ok(Diff { files, diff: full_diff })
+}
+
+/// `git add -A && git commit -m <message>`. `message` is passed as its own
+/// argv entry (never shell-interpolated), so it's safe regardless of
+/// content — including a leading `-`, which argv parsing (not shell
+/// parsing) still binds to `-m`'s value.
+pub async fn commit(worktree_path: &Path, message: &str) -> Result<()> {
+    validate_path(worktree_path)?;
+    if message.trim().is_empty() {
+        return Err(DomainError::Invalid("commit message must not be empty".into()));
+    }
+    run_git(worktree_path, &["add", "-A"]).await?;
+    run_git(worktree_path, &["commit", "-m", message]).await?;
+    Ok(())
+}
+
+/// `git push -u origin <branch>`. No remote configured or no push access
+/// surfaces as a real git error (via run_git's stderr propagation) — not
+/// silently swallowed.
+pub async fn push(worktree_path: &Path, branch: &str) -> Result<()> {
+    validate_path(worktree_path)?;
+    validate_branch_name(branch)?;
+    run_git(worktree_path, &["push", "-u", "origin", branch]).await?;
+    Ok(())
 }

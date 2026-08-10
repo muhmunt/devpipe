@@ -41,6 +41,9 @@ export const api = {
   getWorktree: (id: string) => request<Worktree>(`/worktrees/${id}`),
   deleteWorktree: (id: string) => request<void>(`/worktrees/${id}`, { method: 'DELETE' }),
   diffWorktree: (id: string) => request<Diff>(`/worktrees/${id}/diff`),
+  commitWorktree: (id: string, message: string) =>
+    request<Worktree>(`/worktrees/${id}/commit`, { method: 'POST', body: JSON.stringify({ message }) }),
+  pushWorktree: (id: string) => request<Worktree>(`/worktrees/${id}/push`, { method: 'POST' }),
 
   listAgentDefinitions: () => request<AgentDefinition[]>('/agent-definitions'),
   createAgentDefinition: (body: { id: string; name: string; executable: string; defaultArgs: string[] }) =>

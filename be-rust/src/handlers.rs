@@ -19,6 +19,8 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/repositories/:id/worktrees", get(list_worktrees).post(create_worktree))
         .route("/worktrees/:id", get(get_worktree).delete(delete_worktree))
         .route("/worktrees/:id/diff", get(diff_worktree))
+        .route("/worktrees/:id/commit", post(commit_worktree))
+        .route("/worktrees/:id/push", post(push_worktree))
         .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
         .route("/agents/detect", get(detect_agents))
         .route("/editors/detect", get(detect_editors))
@@ -261,16 +263,7 @@ async fn delete_worktree(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Re
 
 async fn get_worktree(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Json<Worktree>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
-    let target_branch = worktree.target_branch.clone().unwrap_or_else(|| "main".to_string());
-    let fresh_status = crate::git::status(std::path::Path::new(&worktree.path), &target_branch).await?;
-
-    let row = sqlx::query("UPDATE worktrees SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *")
-        .bind(fresh_status.as_str())
-        .bind(Utc::now())
-        .bind(id)
-        .fetch_one(&pool)
-        .await?;
-    Ok(Json(worktree_from_row(&row)?))
+    Ok(Json(refresh_worktree_status(&pool, &worktree).await?))
 }
 
 async fn diff_worktree(
@@ -281,6 +274,41 @@ async fn diff_worktree(
     let target_branch = worktree.target_branch.unwrap_or_else(|| "main".to_string());
     let diff = crate::git::diff(std::path::Path::new(&worktree.path), &target_branch).await?;
     Ok(Json(diff))
+}
+
+/// Recomputes and persists a worktree's status, matching get_worktree's
+/// write-through pattern — used after any git operation that changes it.
+async fn refresh_worktree_status(pool: &PgPool, worktree: &Worktree) -> Result<Worktree, AppError> {
+    let target_branch = worktree.target_branch.clone().unwrap_or_else(|| "main".to_string());
+    let fresh_status = crate::git::status(std::path::Path::new(&worktree.path), &target_branch).await?;
+    let row = sqlx::query("UPDATE worktrees SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *")
+        .bind(fresh_status.as_str())
+        .bind(Utc::now())
+        .bind(worktree.id)
+        .fetch_one(pool)
+        .await?;
+    Ok(worktree_from_row(&row)?)
+}
+
+#[derive(Deserialize)]
+struct CommitBody {
+    message: String,
+}
+
+async fn commit_worktree(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<CommitBody>,
+) -> Result<Json<Worktree>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    crate::git::commit(std::path::Path::new(&worktree.path), &body.message).await?;
+    Ok(Json(refresh_worktree_status(&pool, &worktree).await?))
+}
+
+async fn push_worktree(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Json<Worktree>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    crate::git::push(std::path::Path::new(&worktree.path), &worktree.branch).await?;
+    Ok(Json(refresh_worktree_status(&pool, &worktree).await?))
 }
 
 // --- agent definitions + detection (Rung 4 / phase-r3, phase-r9.2/9.3) ---

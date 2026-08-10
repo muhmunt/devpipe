@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { StatusDot } from '@/components/StatusDot'
 import { DiffView } from '@/components/DiffView'
+import { GitActionBar } from '@/components/GitActionBar'
 import { api } from '@/lib/api'
 import type { AgentEvent, AgentSession, TimelineEntry, Worktree } from '@/lib/types'
 
@@ -171,6 +172,8 @@ export default function WorktreePage() {
             <RefreshCw size={12} className={refreshingStatus ? 'animate-spin' : ''} />
           </button>
         </div>
+
+        <GitActionBar worktree={worktree} onChange={setWorktree} />
 
         <div className="flex gap-4 border-b border-border mb-4 text-sm">
           <button
