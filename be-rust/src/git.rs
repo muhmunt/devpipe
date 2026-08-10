@@ -6,7 +6,7 @@
 use std::path::Path;
 use tokio::process::Command;
 
-use crate::domain::{Diff, DiffFile, DomainError, Result, WorktreeStatus};
+use crate::domain::{Commit, Diff, DiffFile, DomainError, Result, WorktreeStatus};
 
 /// Branch/ref names: conservative allowlist, no leading `-` (flag injection),
 /// no `..` (path traversal via ref syntax).
@@ -190,6 +190,28 @@ pub async fn push(worktree_path: &Path, branch: &str) -> Result<()> {
 /// developer would see as "real" files in the worktree, `.gitignore`
 /// respected automatically, without walking heavy ignored directories
 /// (node_modules, target, ...) the way a raw filesystem walk would.
+/// Recent commit history for the worktree's current branch. Uses a `\x1f`
+/// (unit separator) field delimiter — never appears in real commit
+/// metadata — so multi-line commit messages can't corrupt the parse.
+pub async fn commits(worktree_path: &Path, limit: u32) -> Result<Vec<Commit>> {
+    validate_path(worktree_path)?;
+    let limit_arg = format!("-{limit}");
+    let format_arg = "--pretty=format:%H%x1f%an%x1f%ad%x1f%s".to_string();
+    let output = run_git(worktree_path, &["log", &limit_arg, &format_arg, "--date=short"]).await.unwrap_or_default();
+    Ok(output
+        .lines()
+        .filter_map(|line| {
+            let mut parts = line.splitn(4, '\u{1f}');
+            Some(Commit {
+                hash: parts.next()?.chars().take(8).collect(),
+                author: parts.next()?.to_string(),
+                date: parts.next()?.to_string(),
+                message: parts.next().unwrap_or("").to_string(),
+            })
+        })
+        .collect())
+}
+
 pub async fn list_files(worktree_path: &Path) -> Result<Vec<String>> {
     validate_path(worktree_path)?;
     let tracked = run_git(worktree_path, &["ls-files"]).await?;

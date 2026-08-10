@@ -254,6 +254,15 @@ pub struct Diff {
     pub diff: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Commit {
+    pub hash: String,
+    pub author: String,
+    pub date: String,
+    pub message: String,
+}
+
 #[async_trait]
 pub trait WorktreeManager: Send + Sync {
     async fn create(&self, req: CreateWorktreeRequest) -> Result<Worktree>;

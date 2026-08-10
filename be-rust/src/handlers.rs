@@ -22,6 +22,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/worktrees/:id/commit", post(commit_worktree))
         .route("/worktrees/:id/push", post(push_worktree))
         .route("/worktrees/:id/files", get(list_files))
+        .route("/worktrees/:id/commits", get(list_commits))
         .route("/worktrees/:id/run-script", post(run_script))
         .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
         .route("/agents/detect", get(detect_agents))
@@ -349,6 +350,15 @@ async fn list_files(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<
     let worktree = fetch_worktree(&pool, id).await?;
     let files = crate::git::list_files(std::path::Path::new(&worktree.path)).await?;
     Ok(Json(files))
+}
+
+async fn list_commits(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<crate::domain::Commit>>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    let commits = crate::git::commits(std::path::Path::new(&worktree.path), 30).await?;
+    Ok(Json(commits))
 }
 
 #[derive(Deserialize)]

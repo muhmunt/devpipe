@@ -1,17 +1,21 @@
 import { type ReactNode, useState } from 'react'
 import { PanelLeftClose, PanelLeft } from 'lucide-react'
+import { Sidebar } from '@/components/Sidebar'
+import { TabStrip } from '@/components/TabStrip'
 
-// 3-region grid per spec §18/§87: sidebar (220-280px) / topbar (36-44px) +
-// tabstrip (32-36px) / content. Sidebar collapse persisted to localStorage.
+// IDE-shell layout per the super.engineering reference: sidebar (left) /
+// topbar + tab strip (top) / main content (center) / optional right panel /
+// optional bottom status bar. No fake chrome — every region renders real
+// app state, nothing is drawn purely for decoration.
 export function AppShell({
-  sidebar,
   topBarRight,
-  tabStrip,
+  rightPanel,
+  statusBar,
   children,
 }: {
-  sidebar: ReactNode
   topBarRight?: ReactNode
-  tabStrip?: ReactNode
+  rightPanel?: ReactNode
+  statusBar?: ReactNode
   children: ReactNode
 }) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === 'true')
@@ -24,29 +28,33 @@ export function AppShell({
   }
 
   return (
-    <div className="h-full grid grid-cols-[auto_1fr] bg-background text-text">
-      <aside
-        className={`border-r border-border bg-surface flex flex-col transition-[width] ${
-          collapsed ? 'w-0 overflow-hidden' : 'w-[240px]'
-        }`}
-      >
-        {sidebar}
-      </aside>
-      <div className="grid grid-rows-[40px_auto_1fr] min-w-0">
-        <div className="flex items-center justify-between border-b border-border px-3">
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            className="text-text-muted hover:text-text"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <PanelLeft size={16} /> : <PanelLeftClose size={16} />}
-          </button>
-          <div className="flex items-center gap-2">{topBarRight}</div>
+    <div className="h-full grid grid-rows-[1fr_auto] bg-background text-text">
+      <div className={`grid min-h-0 ${rightPanel ? 'grid-cols-[auto_1fr_280px]' : 'grid-cols-[auto_1fr]'}`}>
+        <aside
+          className={`border-r border-border bg-surface flex flex-col transition-[width] ${
+            collapsed ? 'w-0 overflow-hidden' : 'w-[240px]'
+          }`}
+        >
+          <Sidebar />
+        </aside>
+        <div className="grid grid-rows-[36px_32px_1fr] min-w-0">
+          <div className="flex items-center justify-between border-b border-border px-3">
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="text-text-muted hover:text-text"
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {collapsed ? <PanelLeft size={15} /> : <PanelLeftClose size={15} />}
+            </button>
+            <div className="flex items-center gap-2">{topBarRight}</div>
+          </div>
+          <TabStrip />
+          <main className="min-w-0 min-h-0 overflow-auto">{children}</main>
         </div>
-        {tabStrip && <div className="h-[34px] border-b border-border flex items-center overflow-x-auto">{tabStrip}</div>}
-        <main className="min-w-0 min-h-0 overflow-auto">{children}</main>
+        {rightPanel && <aside className="border-l border-border bg-surface overflow-y-auto">{rightPanel}</aside>}
       </div>
+      {statusBar && <div className="h-[28px] border-t border-border bg-surface flex items-center px-3 text-xs">{statusBar}</div>}
     </div>
   )
 }

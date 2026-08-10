@@ -108,6 +108,13 @@ export type TimelineEntry =
   | { type: 'message'; role: string; text: string }
   | ({ type: string } & Record<string, unknown>)
 
+export type Commit = {
+  hash: string
+  author: string
+  date: string
+  message: string
+}
+
 export type CommandScope = 'global' | 'workspace' | 'repository'
 
 export type Command = {

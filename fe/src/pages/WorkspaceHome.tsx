@@ -31,7 +31,7 @@ export default function WorkspaceHome() {
   }
 
   return (
-    <AppShell sidebar={<div className="p-3 text-sm text-text-muted font-mono">devpipe</div>}>
+    <AppShell>
       <div className="p-6 max-w-[720px]">
         <h1 className="text-lg font-medium mb-4">Workspaces</h1>
 

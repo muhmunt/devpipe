@@ -6,7 +6,17 @@ import type { Worktree } from '@/lib/types'
 // commands to remember. Only wired to real endpoints (commit, push);
 // create-PR/review/merge from the spec's example flow need a GitHub
 // integration that doesn't exist yet, so they're not shown as buttons.
-export function GitActionBar({ worktree, onChange }: { worktree: Worktree; onChange: (wt: Worktree) => void }) {
+// `compact`: renders inline for the bottom status bar instead of a
+// bordered block for the worktree page body.
+export function GitActionBar({
+  worktree,
+  onChange,
+  compact = false,
+}: {
+  worktree: Worktree
+  onChange: (wt: Worktree) => void
+  compact?: boolean
+}) {
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,8 +48,18 @@ export function GitActionBar({ worktree, onChange }: { worktree: Worktree; onCha
     }
   }
 
+  const wrapperClass = compact ? 'flex items-center gap-2' : 'border border-border rounded-lg p-3 mb-4 bg-surface space-y-2';
+  const inputClass = compact
+    ? 'bg-surface-elevated border border-border rounded px-2 py-0.5 text-xs outline-none focus:border-accent'
+    : 'flex-1 bg-surface-elevated border border-border rounded-md px-2 py-1.5 text-sm outline-none focus:border-accent'
+  const buttonClass = compact
+    ? 'bg-accent text-white px-2 py-0.5 rounded text-xs disabled:opacity-50'
+    : 'bg-accent text-white px-3 py-1.5 rounded-md text-sm disabled:opacity-50'
+
   if (worktree.status === 'conflicted') {
-    return (
+    return compact ? (
+      <span className="text-error text-xs">Conflicted — resolve manually</span>
+    ) : (
       <div className="border border-error/40 bg-error/10 rounded-md px-3 py-2 text-sm text-error mb-4">
         Conflicted — resolve manually in the worktree, then refresh status. Automatic conflict resolution is not
         supported.
@@ -52,7 +72,7 @@ export function GitActionBar({ worktree, onChange }: { worktree: Worktree; onCha
   }
 
   return (
-    <div className="border border-border rounded-lg p-3 mb-4 bg-surface space-y-2">
+    <div className={wrapperClass}>
       {error && <p className="text-error text-xs">{error}</p>}
       {worktree.status === 'modified' && (
         <div className="flex gap-2">
@@ -60,25 +80,15 @@ export function GitActionBar({ worktree, onChange }: { worktree: Worktree; onCha
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Commit message"
-            className="flex-1 bg-surface-elevated border border-border rounded-md px-2 py-1.5 text-sm outline-none focus:border-accent"
+            className={inputClass}
           />
-          <button
-            type="button"
-            onClick={commit}
-            disabled={busy || !message.trim()}
-            className="bg-accent text-white px-3 py-1.5 rounded-md text-sm disabled:opacity-50"
-          >
+          <button type="button" onClick={commit} disabled={busy || !message.trim()} className={buttonClass}>
             Commit
           </button>
         </div>
       )}
       {worktree.status === 'ahead' && (
-        <button
-          type="button"
-          onClick={push}
-          disabled={busy}
-          className="bg-accent text-white px-3 py-1.5 rounded-md text-sm disabled:opacity-50"
-        >
+        <button type="button" onClick={push} disabled={busy} className={buttonClass}>
           Push
         </button>
       )}

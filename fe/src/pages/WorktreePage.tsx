@@ -1,23 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { RefreshCw } from 'lucide-react'
+import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { StatusDot } from '@/components/StatusDot'
 import { CommandMenu } from '@/components/CommandMenu'
-import { DiffView } from '@/components/DiffView'
-import { FilesPanel } from '@/components/FilesPanel'
-import { GitActionBar } from '@/components/GitActionBar'
-import { RepoScriptsPanel } from '@/components/RepoScriptsPanel'
+import { RightPanel } from '@/components/RightPanel'
+import { StatusBar } from '@/components/StatusBar'
 import { api } from '@/lib/api'
+import { addTab } from '@/lib/tabs'
 import type { AgentEvent, AgentSession, Repository, TimelineEntry, Worktree } from '@/lib/types'
-
-const WORKTREE_STATUS_COLOR: Record<Worktree['status'], string> = {
-  clean: 'text-success',
-  modified: 'text-warning',
-  conflicted: 'text-error',
-  ahead: 'text-accent',
-  behind: 'text-text-muted',
-}
 
 const SSE_EVENT_NAMES = [
   'session_started',
@@ -33,11 +23,11 @@ const SSE_EVENT_NAMES = [
   'session_error',
 ]
 
-// spec §86 Worktree screen — Timeline / Diff / Files / Scripts tabs, plus
-// the git action bar. Editor handoff / custom commands still pending.
+// spec §86 Worktree screen — main content is the session timeline/composer;
+// Files/Diff/Commits/Scripts live in the persistent right panel (AppShell),
+// branch + git action in the bottom status bar. Editor handoff still pending.
 export default function WorktreePage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const [worktree, setWorktree] = useState<Worktree | null>(null)
   const [repository, setRepository] = useState<Repository | null>(null)
   const [session, setSession] = useState<AgentSession | null>(null)
@@ -45,33 +35,30 @@ export default function WorktreePage() {
   const [agentId, setAgentId] = useState('claude')
   const [prompt, setPrompt] = useState('')
   const [agents, setAgents] = useState<Record<string, boolean>>({})
-  const [tab, setTab] = useState<'timeline' | 'diff' | 'files' | 'scripts'>('timeline')
-  const [refreshingStatus, setRefreshingStatus] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [composerError, setComposerError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const lastLaunchRef = useRef<{ agentId: string; prompt: string } | null>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
     if (!id) return
-    api.getWorktree(id).then((wt) => {
-      setWorktree(wt)
-      api.getRepository(wt.repositoryId).then(setRepository)
-    })
+    setSession(null)
+    setEntries([])
+    setLoadError(null)
+    setWorktree(null)
+    api
+      .getWorktree(id)
+      .then((wt) => {
+        setWorktree(wt)
+        addTab({ id: wt.id, branch: wt.branch })
+        return api.getRepository(wt.repositoryId).then(setRepository)
+      })
+      .catch((e) => setLoadError(String((e as Error).message ?? e)))
     api.detectAgents().then(setAgents)
     return () => esRef.current?.close()
   }, [id])
-
-  async function refreshStatus() {
-    if (!id) return
-    setRefreshingStatus(true)
-    try {
-      setWorktree(await api.getWorktree(id))
-    } finally {
-      setRefreshingStatus(false)
-    }
-  }
 
   function connectStream(sessionId: string) {
     esRef.current?.close()
@@ -149,78 +136,38 @@ export default function WorktreePage() {
     setDeleting(true)
     try {
       await api.deleteWorktree(worktree.id)
-      navigate(-1)
     } finally {
       setDeleting(false)
     }
   }
 
+  if (loadError) {
+    return (
+      <AppShell>
+        <div className="p-6 max-w-[520px]">
+          <p className="text-error text-sm">Couldn't load this worktree: {loadError}</p>
+          <p className="text-text-muted text-xs mt-2">
+            It may have been deleted. Close this tab and pick another worktree from the sidebar.
+          </p>
+        </div>
+      </AppShell>
+    )
+  }
+
   if (!worktree) return null
 
   return (
-    <AppShell sidebar={<div className="p-3 text-sm text-text-muted font-mono">devpipe</div>}>
-      <div className="p-6 max-w-[820px]">
-        <button type="button" onClick={() => navigate(-1)} className="text-xs text-text-muted hover:text-text">
-          ← Back
-        </button>
-        <div className="flex items-center gap-2 mt-2 mb-1">
+    <AppShell
+      rightPanel={<RightPanel worktreeId={worktree.id} repository={repository} onRepositoryChange={setRepository} />}
+      statusBar={<StatusBar worktree={worktree} onChange={setWorktree} />}
+    >
+      <div className="p-6 max-w-[820px] mx-auto">
+        <div className="flex items-center gap-2 mb-6">
           {session && <StatusDot status={session.status} showLabel />}
           <h1 className="text-lg font-medium font-mono">{worktree.branch}</h1>
         </div>
-        <div className="flex items-center gap-2 mb-6">
-          <span className={`text-xs font-mono ${WORKTREE_STATUS_COLOR[worktree.status]}`}>{worktree.status}</span>
-          <button
-            type="button"
-            onClick={refreshStatus}
-            className="text-text-muted hover:text-text"
-            aria-label="Refresh worktree status"
-          >
-            <RefreshCw size={12} className={refreshingStatus ? 'animate-spin' : ''} />
-          </button>
-        </div>
 
-        <GitActionBar worktree={worktree} onChange={setWorktree} />
-
-        <div className="flex gap-4 border-b border-border mb-4 text-sm">
-          <button
-            type="button"
-            onClick={() => setTab('timeline')}
-            className={`pb-2 -mb-px border-b-2 ${tab === 'timeline' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
-          >
-            Timeline
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('diff')}
-            className={`pb-2 -mb-px border-b-2 ${tab === 'diff' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
-          >
-            Diff
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('files')}
-            className={`pb-2 -mb-px border-b-2 ${tab === 'files' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
-          >
-            Files
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('scripts')}
-            className={`pb-2 -mb-px border-b-2 ${tab === 'scripts' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
-          >
-            Scripts
-          </button>
-        </div>
-
-        {tab === 'diff' && <DiffView worktreeId={worktree.id} />}
-        {tab === 'files' && <FilesPanel worktreeId={worktree.id} />}
-        {tab === 'scripts' && repository && (
-          <RepoScriptsPanel repository={repository} worktreeId={worktree.id} onRepositoryChange={setRepository} />
-        )}
-
-        {tab === 'timeline' && (
-          <>
-        <div className="border border-border rounded-lg mb-4 p-4 space-y-3 bg-surface font-mono text-sm min-h-[200px] max-h-[420px] overflow-y-auto">
+        <div className="border border-border rounded-lg mb-4 p-4 space-y-3 bg-surface font-mono text-sm min-h-[300px] max-h-[520px] overflow-y-auto">
           {entries.length === 0 && <p className="text-text-muted">No session yet — launch one below.</p>}
           {entries.map((entry, i) =>
             entry.type === 'message' && 'role' in entry ? (
@@ -243,7 +190,9 @@ export default function WorktreePage() {
 
         {session?.status === 'failed' && (
           <div className="flex items-center gap-2 mb-4 border border-error/40 bg-error/10 rounded-md px-3 py-2">
-            <span className="text-error text-sm flex-1">Session failed{session.exitCode !== null ? ` (exit ${session.exitCode})` : ''}.</span>
+            <span className="text-error text-sm flex-1">
+              Session failed{session.exitCode !== null ? ` (exit ${session.exitCode})` : ''}.
+            </span>
             <button
               type="button"
               onClick={restart}
@@ -317,8 +266,6 @@ export default function WorktreePage() {
             {session?.status === 'needs_input' ? 'Reply' : 'Launch session'}
           </button>
         </form>
-          </>
-        )}
       </div>
     </AppShell>
   )

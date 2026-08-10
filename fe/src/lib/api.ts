@@ -3,6 +3,7 @@ import type {
   AgentSession,
   Command,
   CommandScope,
+  Commit,
   Diff,
   EditorAvailability,
   Repository,
@@ -48,6 +49,7 @@ export const api = {
   getWorktree: (id: string) => request<Worktree>(`/worktrees/${id}`),
   deleteWorktree: (id: string) => request<void>(`/worktrees/${id}`, { method: 'DELETE' }),
   diffWorktree: (id: string) => request<Diff>(`/worktrees/${id}/diff`),
+  listCommits: (id: string) => request<Commit[]>(`/worktrees/${id}/commits`),
   commitWorktree: (id: string, message: string) =>
     request<Worktree>(`/worktrees/${id}/commit`, { method: 'POST', body: JSON.stringify({ message }) }),
   pushWorktree: (id: string) => request<Worktree>(`/worktrees/${id}/push`, { method: 'POST' }),

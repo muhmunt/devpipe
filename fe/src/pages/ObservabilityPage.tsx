@@ -29,7 +29,7 @@ export default function ObservabilityPage() {
   }, [workspaceId])
 
   return (
-    <AppShell sidebar={<div className="p-3 text-sm text-text-muted font-mono">devpipe</div>}>
+    <AppShell>
       <div className="p-6 max-w-[820px]">
         <button type="button" onClick={() => navigate(-1)} className="text-xs text-text-muted hover:text-text">
           ← Back

@@ -2,9 +2,17 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
-import { StatusDot } from '@/components/StatusDot'
 import { api } from '@/lib/api'
+import { addTab } from '@/lib/tabs'
 import type { Repository, Worktree } from '@/lib/types'
+
+const WORKTREE_STATUS_COLOR: Record<Worktree['status'], string> = {
+  clean: 'bg-success',
+  modified: 'bg-warning',
+  conflicted: 'bg-error',
+  ahead: 'bg-accent',
+  behind: 'bg-text-muted',
+}
 
 // spec §86 "Repository" — primary + task worktrees per repository, per the
 // Workspace -> Repository -> Worktree hierarchy (spec §5).
@@ -57,7 +65,7 @@ export default function RepositoryPage() {
   }
 
   return (
-    <AppShell sidebar={<div className="p-3 text-sm text-text-muted font-mono">devpipe</div>}>
+    <AppShell>
       <div className="p-6 max-w-[760px]">
         <div className="flex items-center justify-between">
           <Link to="/" className="text-xs text-text-muted hover:text-text">
@@ -115,8 +123,13 @@ export default function RepositoryPage() {
               </div>
               <div className="divide-y divide-border">
                 {(worktrees[repo.id] ?? []).map((wt) => (
-                  <Link key={wt.id} to={`/worktrees/${wt.id}`} className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface">
-                    <StatusDot status="idle" />
+                  <Link
+                    key={wt.id}
+                    to={`/worktrees/${wt.id}`}
+                    onClick={() => addTab({ id: wt.id, branch: wt.branch })}
+                    className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface"
+                  >
+                    <span className={`size-1.5 rounded-full shrink-0 ${WORKTREE_STATUS_COLOR[wt.status]}`} aria-hidden />
                     <span className="font-mono text-xs">{wt.branch}</span>
                     <span className="text-text-muted text-xs ml-auto">{wt.status}</span>
                   </Link>
