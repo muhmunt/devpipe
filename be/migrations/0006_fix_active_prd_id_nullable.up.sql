@@ -1,0 +1,12 @@
+-- cards.active_prd_id and prds.card_id are mutually NOT NULL, which is
+-- unsatisfiable by any insert ordering (CardStore.Create inserts the card
+-- first, then the PRD, then activates it — the card row necessarily
+-- exists with no active PRD for the brief window between the first two
+-- statements of that transaction). This NOT NULL also contradicted the
+-- column's own FK, whose ON DELETE SET NULL would try to null the column
+-- if its active PRD were ever deleted. The "every card has an active PRD"
+-- invariant was always enforced at the application/transaction level
+-- (CardStore.Create commits only once active_prd_id is set) — the DB
+-- constraint could never correctly express it given this schema's
+-- circular dependency, and blocked all card creation since it was added.
+ALTER TABLE cards ALTER COLUMN active_prd_id DROP NOT NULL;
