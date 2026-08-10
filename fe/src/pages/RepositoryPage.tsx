@@ -59,9 +59,14 @@ export default function RepositoryPage() {
   return (
     <AppShell sidebar={<div className="p-3 text-sm text-text-muted font-mono">devpipe</div>}>
       <div className="p-6 max-w-[760px]">
-        <Link to="/" className="text-xs text-text-muted hover:text-text">
-          ← Workspaces
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link to="/" className="text-xs text-text-muted hover:text-text">
+            ← Workspaces
+          </Link>
+          <Link to={`/workspaces/${workspaceId}/observability`} className="text-xs text-text-muted hover:text-text">
+            Observability →
+          </Link>
+        </div>
         <h1 className="text-lg font-medium mt-2 mb-4">Repositories</h1>
 
         <form onSubmit={createRepository} className="grid grid-cols-3 gap-2 mb-6">

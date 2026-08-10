@@ -70,6 +70,9 @@ export const api = {
   createCommand: (body: { scope: CommandScope; scopeId?: string; name: string; prompt: string }) =>
     request<Command>('/commands', { method: 'POST', body: JSON.stringify(body) }),
 
+  listSessionsObservability: (workspaceId: string) =>
+    request<AgentSession[]>(`/observability/sessions?workspaceId=${workspaceId}`),
+
   createSession: (
     worktreeId: string,
     body: { agentDefinitionId: string; model?: string; reasoningLevel?: string; prompt: string },
