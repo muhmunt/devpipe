@@ -6,7 +6,7 @@ use serde::Deserialize;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use crate::domain::{Repository, Worktree, WorktreeKind, WorktreeStatus, Workspace};
+use crate::domain::{AgentDefinition, Repository, Worktree, WorktreeKind, WorktreeStatus, Workspace};
 use crate::error::AppError;
 
 pub fn routes() -> Router<PgPool> {
@@ -19,6 +19,9 @@ pub fn routes() -> Router<PgPool> {
         .route("/repositories/:id/worktrees", post(create_worktree))
         .route("/worktrees/:id", get(get_worktree).delete(delete_worktree))
         .route("/worktrees/:id/diff", get(diff_worktree))
+        .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
+        .route("/agents/detect", get(detect_agents))
+        .route("/editors/detect", get(detect_editors))
 }
 
 fn workspace_from_row(row: &sqlx::postgres::PgRow) -> Workspace {
@@ -266,4 +269,63 @@ async fn diff_worktree(
     let target_branch = worktree.target_branch.unwrap_or_else(|| "main".to_string());
     let diff = crate::git::diff(std::path::Path::new(&worktree.path), &target_branch).await?;
     Ok(Json(diff))
+}
+
+// --- agent definitions + detection (Rung 4 / phase-r3, phase-r9.2/9.3) ---
+
+fn agent_definition_from_row(row: &sqlx::postgres::PgRow) -> AgentDefinition {
+    let default_args: sqlx::types::Json<Vec<String>> = row.get("default_args");
+    AgentDefinition {
+        id: row.get("id"),
+        name: row.get("name"),
+        executable: row.get("executable"),
+        default_args: default_args.0,
+        capabilities: row.get("capabilities"),
+    }
+}
+
+async fn list_agent_definitions(State(pool): State<PgPool>) -> Result<Json<Vec<AgentDefinition>>, AppError> {
+    let rows = sqlx::query("SELECT * FROM agent_definitions ORDER BY id").fetch_all(&pool).await?;
+    Ok(Json(rows.iter().map(agent_definition_from_row).collect()))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateAgentDefinitionBody {
+    id: String,
+    name: String,
+    executable: String,
+    default_args: Vec<String>,
+}
+
+async fn create_agent_definition(
+    State(pool): State<PgPool>,
+    Json(body): Json<CreateAgentDefinitionBody>,
+) -> Result<Json<AgentDefinition>, AppError> {
+    let row = sqlx::query(
+        "INSERT INTO agent_definitions (id, name, executable, default_args, capabilities)
+         VALUES ($1, $2, $3, $4, '{}') RETURNING *",
+    )
+    .bind(&body.id)
+    .bind(&body.name)
+    .bind(&body.executable)
+    .bind(sqlx::types::Json(&body.default_args))
+    .fetch_one(&pool)
+    .await?;
+    Ok(Json(agent_definition_from_row(&row)))
+}
+
+async fn detect_agents(State(pool): State<PgPool>) -> Result<Json<std::collections::HashMap<String, bool>>, AppError> {
+    let rows = sqlx::query("SELECT id, executable FROM agent_definitions").fetch_all(&pool).await?;
+    let mut result = std::collections::HashMap::new();
+    for row in rows {
+        let id: String = row.get("id");
+        let executable: String = row.get("executable");
+        result.insert(id, crate::agents::detect_executable(&executable).await);
+    }
+    Ok(Json(result))
+}
+
+async fn detect_editors() -> Json<crate::editors::EditorAvailability> {
+    Json(crate::editors::detect_all().await)
 }

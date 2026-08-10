@@ -1,8 +1,11 @@
+mod agents;
 mod db;
 mod domain;
+mod editors;
 mod error;
 mod git;
 mod handlers;
+mod process_manager;
 
 use axum::Router;
 
