@@ -53,15 +53,15 @@ export function GitActionBar({
     ? 'bg-surface-elevated border border-border rounded px-2 py-0.5 text-xs outline-none focus:border-accent'
     : 'flex-1 bg-surface-elevated border border-border rounded-md px-2 py-1.5 text-sm outline-none focus:border-accent'
   const buttonClass = compact
-    ? 'bg-accent text-white px-2 py-0.5 rounded text-xs disabled:opacity-50'
-    : 'bg-accent text-white px-3 py-1.5 rounded-md text-sm disabled:opacity-50'
+    ? 'bg-accent-strong text-white px-2 py-0.5 rounded text-xs disabled:opacity-50'
+    : 'bg-accent-strong text-white px-3 py-1.5 rounded-md text-sm disabled:opacity-50'
 
   if (worktree.status === 'conflicted') {
     return compact ? (
-      <span className="text-error text-xs">Conflicted — resolve manually</span>
+      <span className="text-error text-xs">Conflicted. Resolve manually.</span>
     ) : (
       <div className="border border-error/40 bg-error/10 rounded-md px-3 py-2 text-sm text-error mb-4">
-        Conflicted — resolve manually in the worktree, then refresh status. Automatic conflict resolution is not
+        Conflicted. Resolve manually in the worktree, then refresh status. Automatic conflict resolution is not
         supported.
       </div>
     )

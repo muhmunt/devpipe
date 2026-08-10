@@ -33,6 +33,21 @@ export const api = {
   createWorkspace: (body: { name: string; color?: string; icon?: string }) =>
     request<Workspace>('/workspaces', { method: 'POST', body: JSON.stringify(body) }),
   getWorkspace: (id: string) => request<Workspace>(`/workspaces/${id}`),
+  deleteWorkspace: (id: string) => request<void>(`/workspaces/${id}`, { method: 'DELETE' }),
+  /// Creates workspace + first repository atomically (open an existing repo,
+  /// or clone one first). Replaces the old two-call flow, which orphaned an
+  /// empty workspace whenever the repository step failed.
+  initWorkspace: (body: {
+    name: string
+    source: 'open' | 'clone'
+    path: string
+    cloneUrl?: string
+    defaultBranch?: string
+  }) =>
+    request<{ workspace: Workspace; repository: Repository }>('/workspaces/init', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   listRepositories: (workspaceId: string) => request<Repository[]>(`/workspaces/${workspaceId}/repositories`),
   createRepository: (body: { workspaceId: string; name: string; localPath: string; remoteUrl?: string; defaultBranch?: string }) =>

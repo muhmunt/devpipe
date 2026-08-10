@@ -31,7 +31,7 @@ export function AppShell({
     <div className="h-full grid grid-rows-[1fr_auto] bg-background text-text">
       <div className={`grid min-h-0 ${rightPanel ? 'grid-cols-[auto_1fr_280px]' : 'grid-cols-[auto_1fr]'}`}>
         <aside
-          className={`mac-vibrancy border-r border-border flex flex-col transition-[width] duration-200 ${
+          className={`chrome border-r border-border flex flex-col transition-[width] duration-200 ${
             collapsed ? 'w-0 overflow-hidden' : 'w-[240px]'
           }`}
           style={{ transitionTimingFunction: 'var(--ease-out)' }}
@@ -39,7 +39,7 @@ export function AppShell({
           <Sidebar />
         </aside>
         <div className="grid grid-rows-[36px_32px_1fr] min-w-0">
-          <div className="mac-vibrancy flex items-center justify-between border-b border-border px-3">
+          <div className="chrome flex items-center justify-between border-b border-border px-3">
             <button
               type="button"
               onClick={toggleCollapsed}
@@ -53,10 +53,10 @@ export function AppShell({
           <TabStrip />
           <main className="min-w-0 min-h-0 overflow-auto">{children}</main>
         </div>
-        {rightPanel && <aside className="mac-vibrancy border-l border-border overflow-y-auto">{rightPanel}</aside>}
+        {rightPanel && <aside className="chrome border-l border-border overflow-y-auto">{rightPanel}</aside>}
       </div>
       {statusBar && (
-        <div className="mac-vibrancy h-[28px] border-t border-border flex items-center px-3 text-xs">{statusBar}</div>
+        <div className="chrome h-[28px] border-t border-border flex items-center px-3 text-xs">{statusBar}</div>
       )}
     </div>
   )

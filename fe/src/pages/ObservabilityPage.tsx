@@ -6,7 +6,7 @@ import { api } from '@/lib/api'
 import type { AgentSession } from '@/lib/types'
 
 function elapsed(session: AgentSession): string {
-  if (!session.startedAt) return '—'
+  if (!session.startedAt) return '-'
   const end = session.endedAt ? new Date(session.endedAt) : new Date()
   const ms = end.getTime() - new Date(session.startedAt).getTime()
   const sec = Math.round(ms / 1000)
@@ -54,7 +54,7 @@ export default function ObservabilityPage() {
                     <StatusDot status={s.status} showLabel />
                   </td>
                   <td className="px-3 py-2 text-text-muted">{elapsed(s)}</td>
-                  <td className="px-3 py-2 text-text-muted">{s.exitCode ?? '—'}</td>
+                  <td className="px-3 py-2 text-text-muted">{s.exitCode ?? '-'}</td>
                 </tr>
               ))}
               {sessions.length === 0 && (

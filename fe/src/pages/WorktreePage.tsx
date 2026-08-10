@@ -168,7 +168,7 @@ export default function WorktreePage() {
         </div>
 
         <div className="border border-border rounded-lg mb-4 p-4 space-y-3 bg-surface font-mono text-sm min-h-[300px] max-h-[520px] overflow-y-auto">
-          {entries.length === 0 && <p className="text-text-muted">No session yet — launch one below.</p>}
+          {entries.length === 0 && <p className="text-text-muted">No session yet. Launch one below.</p>}
           {entries.map((entry, i) =>
             entry.type === 'message' && 'role' in entry ? (
               <div key={i} className="whitespace-pre-wrap">
@@ -261,7 +261,7 @@ export default function WorktreePage() {
           <button
             type="submit"
             disabled={session?.status === 'running' || session?.status === 'starting'}
-            className="bg-accent text-white px-3 py-2 rounded-md text-sm disabled:opacity-50"
+            className="bg-accent-strong text-white px-3 py-2 rounded-md text-sm disabled:opacity-50"
           >
             {session?.status === 'needs_input' ? 'Reply' : 'Launch session'}
           </button>

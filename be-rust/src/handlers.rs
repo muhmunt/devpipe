@@ -2,7 +2,7 @@ use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::Utc;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
@@ -12,7 +12,8 @@ use crate::error::AppError;
 pub fn routes() -> Router<crate::state::AppState> {
     Router::new()
         .route("/workspaces", get(list_workspaces).post(create_workspace))
-        .route("/workspaces/:id", get(get_workspace))
+        .route("/workspaces/:id", get(get_workspace).delete(delete_workspace))
+        .route("/workspaces/init", post(init_workspace))
         .route("/workspaces/:id/repositories", get(list_repositories))
         .route("/repositories", post(create_repository))
         .route("/repositories/clone", post(clone_repository))
@@ -112,6 +113,126 @@ async fn create_workspace(
     .fetch_one(&pool)
     .await?;
     Ok(Json(workspace_from_row(&row)))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InitWorkspaceBody {
+    name: String,
+    /// "open" uses an existing local repo at `path`; "clone" clones
+    /// `cloneUrl` into `path` first.
+    source: String,
+    path: String,
+    clone_url: Option<String>,
+    default_branch: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InitWorkspaceResponse {
+    workspace: Workspace,
+    repository: Repository,
+}
+
+/// Creates a workspace and its first repository as one unit (spec §58
+/// first-launch flow). Everything is validated *before* the workspace row
+/// is written, and both inserts share a transaction, so a bad path or a
+/// failed clone can't leave an orphaned empty workspace behind — which is
+/// exactly what the previous two-call frontend flow did on every typo.
+async fn init_workspace(
+    State(pool): State<PgPool>,
+    Json(body): Json<InitWorkspaceBody>,
+) -> Result<Json<InitWorkspaceResponse>, AppError> {
+    let path = std::path::Path::new(&body.path);
+    crate::git::validate_path(path)?;
+
+    match body.source.as_str() {
+        "clone" => {
+            let url = body.clone_url.as_deref().unwrap_or_default();
+            if url.trim().is_empty() {
+                return Err(AppError::Invalid("cloneUrl is required when source is \"clone\"".into()));
+            }
+            // Clone first: if it fails, nothing has been written to the DB.
+            crate::git::clone(url, path).await?;
+        }
+        "open" => {
+            if !path.exists() {
+                return Err(AppError::Invalid(format!("path does not exist: {}", body.path)));
+            }
+            if !crate::git::is_git_repo(path).await {
+                return Err(AppError::Invalid(format!("not a git repository: {}", body.path)));
+            }
+        }
+        other => return Err(AppError::Invalid(format!("unknown source: {other}"))),
+    }
+
+    let mut tx = pool.begin().await?;
+    let now = Utc::now();
+    let workspace_id = Uuid::new_v4();
+    let ws_row = sqlx::query(
+        "INSERT INTO workspaces (id, name, created_at, updated_at) VALUES ($1, $2, $3, $3) RETURNING *",
+    )
+    .bind(workspace_id)
+    .bind(&body.name)
+    .bind(now)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let repo_row = sqlx::query(
+        "INSERT INTO repositories (id, workspace_id, name, local_path, remote_url, default_branch, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING *",
+    )
+    .bind(Uuid::new_v4())
+    .bind(workspace_id)
+    .bind(&body.name)
+    .bind(&body.path)
+    .bind(&body.clone_url)
+    .bind(body.default_branch.unwrap_or_else(|| "main".to_string()))
+    .bind(now)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok(Json(InitWorkspaceResponse {
+        workspace: workspace_from_row(&ws_row),
+        repository: repository_from_row(&repo_row),
+    }))
+}
+
+/// Removes the git worktrees devpipe created for this workspace, then
+/// deletes the workspace (repositories/worktrees cascade). Never touches
+/// the repository source directory itself — devpipe didn't create the
+/// user's code and must not delete it.
+async fn delete_workspace(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<(), AppError> {
+    let rows = sqlx::query(
+        "SELECT w.path AS worktree_path, r.local_path AS repo_path
+         FROM worktrees w JOIN repositories r ON r.id = w.repository_id
+         WHERE r.workspace_id = $1",
+    )
+    .bind(id)
+    .fetch_all(&pool)
+    .await?;
+
+    for row in rows {
+        let worktree_path: String = row.get("worktree_path");
+        let repo_path: String = row.get("repo_path");
+        if let Err(e) = crate::git::worktree_remove(
+            std::path::Path::new(&repo_path),
+            std::path::Path::new(&worktree_path),
+        )
+        .await
+        {
+            // Best effort: a worktree already gone from disk shouldn't block
+            // cleanup of the database rows.
+            eprintln!("workspace {id}: could not remove worktree {worktree_path}: {e}");
+        }
+    }
+
+    let result = sqlx::query("DELETE FROM workspaces WHERE id = $1").bind(id).execute(&pool).await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
 }
 
 async fn get_workspace(

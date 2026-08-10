@@ -90,7 +90,7 @@ export default function RepositoryPage() {
             placeholder="Local path (/abs/path)"
             className="bg-surface border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent font-mono"
           />
-          <button type="submit" className="flex items-center justify-center gap-1.5 bg-accent text-white px-3 py-2 rounded-md text-sm">
+          <button type="submit" className="flex items-center justify-center gap-1.5 bg-accent-strong text-white px-3 py-2 rounded-md text-sm">
             <Plus size={14} /> Add repo
           </button>
         </form>
@@ -115,7 +115,7 @@ export default function RepositoryPage() {
                   <button
                     type="button"
                     onClick={() => createWorktree(repo.id)}
-                    className="text-xs bg-accent text-white px-2 py-1 rounded-md"
+                    className="text-xs bg-accent-strong text-white px-2 py-1 rounded-md"
                   >
                     New worktree
                   </button>

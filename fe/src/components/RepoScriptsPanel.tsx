@@ -99,7 +99,7 @@ export function RepoScriptsPanel({
         type="button"
         onClick={save}
         disabled={saving}
-        className="bg-accent text-white px-3 py-1.5 rounded-md text-sm disabled:opacity-50"
+        className="bg-accent-strong text-white px-3 py-1.5 rounded-md text-sm disabled:opacity-50"
       >
         Save scripts
       </button>

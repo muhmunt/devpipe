@@ -95,7 +95,7 @@ export function CommandMenu({
               <option value="workspace">workspace</option>
               <option value="global">global</option>
             </select>
-            <button type="submit" className="text-xs bg-accent text-white px-2 py-1 rounded-md ml-auto">
+            <button type="submit" className="text-xs bg-accent-strong text-white px-2 py-1 rounded-md ml-auto">
               Create
             </button>
           </div>
