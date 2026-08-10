@@ -3,15 +3,21 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { setThemePreference, getThemePreference } from '@/lib/theme'
 
-// ⌘K command palette (spec §29). Every entry has a real handler — no
-// placeholder commands for features that don't exist yet.
+// ⌘K/⌘P command palette (spec §29). Every entry has a real handler — no
+// placeholder commands for features that don't exist yet. ⌘P binds to the
+// same palette as ⌘K rather than a separate quick-search view — there's no
+// distinct search surface to open yet (no cross-workspace search index),
+// and cmdk's input already filters this same list. ⌘N/⌘T/⌘W/⌘1-9 from the
+// spec's full keybind table are deliberately NOT bound here: there is no
+// tab strip / open-sessions list in the UI yet for them to act on, and
+// binding a key to nothing would be a dead shortcut.
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'p')) {
         e.preventDefault()
         setOpen((o) => !o)
       }

@@ -257,6 +257,13 @@ export default function WorktreePage() {
             ref={composerRef}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              // ⌘Enter / Ctrl+Enter (spec §29) — submit without leaving the textarea.
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault()
+                e.currentTarget.form?.requestSubmit()
+              }
+            }}
             placeholder={session?.status === 'needs_input' ? 'Answer the agent...' : 'Describe the task...'}
             rows={3}
             disabled={session?.status === 'running' || session?.status === 'starting'}
