@@ -1,6 +1,7 @@
 mod db;
 mod domain;
 mod error;
+mod git;
 mod handlers;
 
 use axum::Router;

@@ -18,6 +18,7 @@ pub fn routes() -> Router<PgPool> {
         .route("/repositories/:id", get(get_repository))
         .route("/repositories/:id/worktrees", post(create_worktree))
         .route("/worktrees/:id", get(get_worktree).delete(delete_worktree))
+        .route("/worktrees/:id/diff", get(diff_worktree))
 }
 
 fn workspace_from_row(row: &sqlx::postgres::PgRow) -> Workspace {
@@ -174,31 +175,95 @@ async fn get_repository(
 }
 
 // --- worktrees ----------------------------------------------------------
-// Real git operations land in Rung 3 (phase-r2). Until then, create/delete
-// return 501 rather than faking a worktree that doesn't exist on disk.
 
-async fn create_worktree(
-    State(_pool): State<PgPool>,
-    Path(_repository_id): Path<Uuid>,
-) -> Result<Json<Worktree>, AppError> {
-    Err(AppError::NotImplemented)
-}
-
-async fn delete_worktree(
-    State(_pool): State<PgPool>,
-    Path(_id): Path<Uuid>,
-) -> Result<(), AppError> {
-    Err(AppError::NotImplemented)
-}
-
-async fn get_worktree(
-    State(pool): State<PgPool>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Worktree>, AppError> {
-    let row = sqlx::query("SELECT * FROM worktrees WHERE id = $1")
+async fn fetch_repository(pool: &PgPool, id: Uuid) -> Result<Repository, AppError> {
+    let row = sqlx::query("SELECT * FROM repositories WHERE id = $1")
         .bind(id)
-        .fetch_optional(&pool)
+        .fetch_optional(pool)
         .await?
         .ok_or(AppError::NotFound)?;
+    Ok(repository_from_row(&row))
+}
+
+async fn fetch_worktree(pool: &PgPool, id: Uuid) -> Result<Worktree, AppError> {
+    let row = sqlx::query("SELECT * FROM worktrees WHERE id = $1")
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(worktree_from_row(&row)?)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateWorktreeBody {
+    branch: String,
+    target_branch: Option<String>,
+}
+
+async fn create_worktree(
+    State(pool): State<PgPool>,
+    Path(repository_id): Path<Uuid>,
+    Json(body): Json<CreateWorktreeBody>,
+) -> Result<Json<Worktree>, AppError> {
+    let repo = fetch_repository(&pool, repository_id).await?;
+    let target_branch = body.target_branch.unwrap_or(repo.default_branch);
+    let id = Uuid::new_v4();
+    let repo_path = std::path::PathBuf::from(&repo.local_path);
+    let worktree_path = repo_path.join(".worktrees").join(id.to_string());
+
+    crate::git::worktree_add(&repo_path, &worktree_path, &body.branch, &target_branch).await?;
+
+    let now = Utc::now();
+    let row = sqlx::query(
+        "INSERT INTO worktrees (id, repository_id, path, branch, target_branch, kind, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, 'task', 'clean', $6, $6) RETURNING *",
+    )
+    .bind(id)
+    .bind(repository_id)
+    .bind(worktree_path.to_string_lossy().to_string())
+    .bind(&body.branch)
+    .bind(&target_branch)
+    .bind(now)
+    .fetch_one(&pool)
+    .await?;
     Ok(Json(worktree_from_row(&row)?))
+}
+
+async fn delete_worktree(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<(), AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    let repo = fetch_repository(&pool, worktree.repository_id).await?;
+
+    crate::git::worktree_remove(
+        std::path::Path::new(&repo.local_path),
+        std::path::Path::new(&worktree.path),
+    )
+    .await?;
+
+    sqlx::query("DELETE FROM worktrees WHERE id = $1").bind(id).execute(&pool).await?;
+    Ok(())
+}
+
+async fn get_worktree(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Json<Worktree>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    let target_branch = worktree.target_branch.clone().unwrap_or_else(|| "main".to_string());
+    let fresh_status = crate::git::status(std::path::Path::new(&worktree.path), &target_branch).await?;
+
+    let row = sqlx::query("UPDATE worktrees SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *")
+        .bind(fresh_status.as_str())
+        .bind(Utc::now())
+        .bind(id)
+        .fetch_one(&pool)
+        .await?;
+    Ok(Json(worktree_from_row(&row)?))
+}
+
+async fn diff_worktree(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::domain::Diff>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    let target_branch = worktree.target_branch.unwrap_or_else(|| "main".to_string());
+    let diff = crate::git::diff(std::path::Path::new(&worktree.path), &target_branch).await?;
+    Ok(Json(diff))
 }
