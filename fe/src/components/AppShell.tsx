@@ -19,6 +19,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
 
   const [cards, setCards] = useState<Card[]>([])
+  const runningCount = cards.filter((c) => c.status === 'running').length
 
   useEffect(() => {
     api.listCards().then(setCards).catch(() => {})
@@ -71,7 +72,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <Terminal className="size-5 text-primary" />
             <h1 className="text-xl font-headline font-black tracking-tighter">devpipe</h1>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            {runningCount > 0 && (
+              <span className="text-[10px] font-mono uppercase tracking-wide px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary">
+                {runningCount} running
+              </span>
+            )}
+            <ThemeToggle />
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
