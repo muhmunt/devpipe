@@ -151,6 +151,7 @@ async fn create_repository(
     State(pool): State<PgPool>,
     Json(body): Json<CreateRepositoryBody>,
 ) -> Result<Json<Repository>, AppError> {
+    crate::git::validate_path(std::path::Path::new(&body.local_path))?;
     let id = Uuid::new_v4();
     let now = Utc::now();
     let default_branch = body.default_branch.unwrap_or_else(|| "main".to_string());

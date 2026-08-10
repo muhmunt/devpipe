@@ -28,6 +28,7 @@ pub fn routes() -> Router<AppState> {
         .route("/sessions/:id/events", get(stream_events))
         .route("/sessions/:id/timeline", get(timeline))
         .route("/sessions/:id/reply", post(reply))
+        .route("/observability/sessions", get(list_sessions))
 }
 
 fn session_from_row(row: &sqlx::postgres::PgRow) -> AgentSession {
@@ -380,4 +381,30 @@ pub async fn reconcile_orphaned_sessions(pool: &PgPool) {
         .await;
         eprintln!("reconciled orphaned session {id} -> failed (server restart)");
     }
+}
+
+#[derive(Deserialize)]
+struct ListSessionsParams {
+    #[serde(rename = "workspaceId")]
+    workspace_id: Option<Uuid>,
+}
+
+/// Observability dashboard data (spec §43) — real fields only. No
+/// tokens/cost/files-changed/tests columns: no adapter currently reports
+/// usage, and no adapter emits FileChanged or test-result events (Rung 4's
+/// spawn_and_stream only produces SessionStarted/MessageDelta/
+/// SessionCompleted/SessionError). Fabricating those columns would violate
+/// the "ship what's real" rule from phase-r8 — add them here once an
+/// adapter actually populates the underlying data, not before.
+async fn list_sessions(
+    State(pool): State<PgPool>,
+    Query(params): Query<ListSessionsParams>,
+) -> Result<Json<Vec<AgentSession>>, AppError> {
+    let rows = sqlx::query(
+        "SELECT * FROM agent_sessions WHERE ($1::uuid IS NULL OR workspace_id = $1) ORDER BY started_at DESC NULLS LAST",
+    )
+    .bind(params.workspace_id)
+    .fetch_all(&pool)
+    .await?;
+    Ok(Json(rows.iter().map(session_from_row).collect()))
 }
