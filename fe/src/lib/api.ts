@@ -4,6 +4,7 @@ import type {
   Diff,
   EditorAvailability,
   Repository,
+  ScriptOutput,
   TimelineEntry,
   Worktree,
   Workspace,
@@ -34,6 +35,10 @@ export const api = {
   createRepository: (body: { workspaceId: string; name: string; localPath: string; remoteUrl?: string; defaultBranch?: string }) =>
     request<Repository>('/repositories', { method: 'POST', body: JSON.stringify(body) }),
   getRepository: (id: string) => request<Repository>(`/repositories/${id}`),
+  updateRepositoryScripts: (
+    id: string,
+    body: { setupScript?: string | null; runScript?: string | null; testScript?: string | null; teardownScript?: string | null },
+  ) => request<Repository>(`/repositories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   listWorktrees: (repositoryId: string) => request<Worktree[]>(`/repositories/${repositoryId}/worktrees`),
   createWorktree: (repositoryId: string, body: { branch: string; targetBranch?: string }) =>
@@ -45,6 +50,8 @@ export const api = {
     request<Worktree>(`/worktrees/${id}/commit`, { method: 'POST', body: JSON.stringify({ message }) }),
   pushWorktree: (id: string) => request<Worktree>(`/worktrees/${id}/push`, { method: 'POST' }),
   listFiles: (id: string) => request<string[]>(`/worktrees/${id}/files`),
+  runScript: (worktreeId: string, script: 'setup' | 'run' | 'test' | 'teardown') =>
+    request<ScriptOutput>(`/worktrees/${worktreeId}/run-script`, { method: 'POST', body: JSON.stringify({ script }) }),
 
   listAgentDefinitions: () => request<AgentDefinition[]>('/agent-definitions'),
   createAgentDefinition: (body: { id: string; name: string; executable: string; defaultArgs: string[] }) =>

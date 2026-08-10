@@ -6,8 +6,9 @@ import { StatusDot } from '@/components/StatusDot'
 import { DiffView } from '@/components/DiffView'
 import { FilesPanel } from '@/components/FilesPanel'
 import { GitActionBar } from '@/components/GitActionBar'
+import { RepoScriptsPanel } from '@/components/RepoScriptsPanel'
 import { api } from '@/lib/api'
-import type { AgentEvent, AgentSession, TimelineEntry, Worktree } from '@/lib/types'
+import type { AgentEvent, AgentSession, Repository, TimelineEntry, Worktree } from '@/lib/types'
 
 const WORKTREE_STATUS_COLOR: Record<Worktree['status'], string> = {
   clean: 'text-success',
@@ -31,19 +32,19 @@ const SSE_EVENT_NAMES = [
   'session_error',
 ]
 
-// spec §86 Worktree screen — Timeline / Diff / Files tabs, plus the git
-// action bar. Editor handoff / workspace scripts / custom commands still
-// pending their own backend endpoints.
+// spec §86 Worktree screen — Timeline / Diff / Files / Scripts tabs, plus
+// the git action bar. Editor handoff / custom commands still pending.
 export default function WorktreePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [worktree, setWorktree] = useState<Worktree | null>(null)
+  const [repository, setRepository] = useState<Repository | null>(null)
   const [session, setSession] = useState<AgentSession | null>(null)
   const [entries, setEntries] = useState<TimelineEntry[]>([])
   const [agentId, setAgentId] = useState('claude')
   const [prompt, setPrompt] = useState('')
   const [agents, setAgents] = useState<Record<string, boolean>>({})
-  const [tab, setTab] = useState<'timeline' | 'diff' | 'files'>('timeline')
+  const [tab, setTab] = useState<'timeline' | 'diff' | 'files' | 'scripts'>('timeline')
   const [refreshingStatus, setRefreshingStatus] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [composerError, setComposerError] = useState<string | null>(null)
@@ -53,7 +54,10 @@ export default function WorktreePage() {
 
   useEffect(() => {
     if (!id) return
-    api.getWorktree(id).then(setWorktree)
+    api.getWorktree(id).then((wt) => {
+      setWorktree(wt)
+      api.getRepository(wt.repositoryId).then(setRepository)
+    })
     api.detectAgents().then(setAgents)
     return () => esRef.current?.close()
   }, [id])
@@ -198,10 +202,20 @@ export default function WorktreePage() {
           >
             Files
           </button>
+          <button
+            type="button"
+            onClick={() => setTab('scripts')}
+            className={`pb-2 -mb-px border-b-2 ${tab === 'scripts' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
+          >
+            Scripts
+          </button>
         </div>
 
         {tab === 'diff' && <DiffView worktreeId={worktree.id} />}
         {tab === 'files' && <FilesPanel worktreeId={worktree.id} />}
+        {tab === 'scripts' && repository && (
+          <RepoScriptsPanel repository={repository} worktreeId={worktree.id} onRepositoryChange={setRepository} />
+        )}
 
         {tab === 'timeline' && (
           <>

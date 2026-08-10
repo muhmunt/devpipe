@@ -108,6 +108,12 @@ export type TimelineEntry =
   | { type: 'message'; role: string; text: string }
   | ({ type: string } & Record<string, unknown>)
 
+export type ScriptOutput = {
+  stdout: string
+  stderr: string
+  exitCode: number
+}
+
 export type EditorAvailability = {
   vscode: boolean
   cursor: boolean

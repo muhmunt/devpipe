@@ -15,13 +15,14 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/workspaces/:id", get(get_workspace))
         .route("/workspaces/:id/repositories", get(list_repositories))
         .route("/repositories", post(create_repository))
-        .route("/repositories/:id", get(get_repository))
+        .route("/repositories/:id", get(get_repository).patch(update_repository_scripts))
         .route("/repositories/:id/worktrees", get(list_worktrees).post(create_worktree))
         .route("/worktrees/:id", get(get_worktree).delete(delete_worktree))
         .route("/worktrees/:id/diff", get(diff_worktree))
         .route("/worktrees/:id/commit", post(commit_worktree))
         .route("/worktrees/:id/push", post(push_worktree))
         .route("/worktrees/:id/files", get(list_files))
+        .route("/worktrees/:id/run-script", post(run_script))
         .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
         .route("/agents/detect", get(detect_agents))
         .route("/editors/detect", get(detect_editors))
@@ -180,6 +181,36 @@ async fn get_repository(
     Ok(Json(repository_from_row(&row)))
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateRepositoryScriptsBody {
+    setup_script: Option<String>,
+    run_script: Option<String>,
+    test_script: Option<String>,
+    teardown_script: Option<String>,
+}
+
+async fn update_repository_scripts(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<UpdateRepositoryScriptsBody>,
+) -> Result<Json<Repository>, AppError> {
+    let row = sqlx::query(
+        "UPDATE repositories SET setup_script = $1, run_script = $2, test_script = $3, teardown_script = $4, updated_at = $5
+         WHERE id = $6 RETURNING *",
+    )
+    .bind(&body.setup_script)
+    .bind(&body.run_script)
+    .bind(&body.test_script)
+    .bind(&body.teardown_script)
+    .bind(Utc::now())
+    .bind(id)
+    .fetch_optional(&pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    Ok(Json(repository_from_row(&row)))
+}
+
 // --- worktrees ----------------------------------------------------------
 
 pub(crate) async fn fetch_repository(pool: &PgPool, id: Uuid) -> Result<Repository, AppError> {
@@ -316,6 +347,32 @@ async fn list_files(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<
     let worktree = fetch_worktree(&pool, id).await?;
     let files = crate::git::list_files(std::path::Path::new(&worktree.path)).await?;
     Ok(Json(files))
+}
+
+#[derive(Deserialize)]
+struct RunScriptBody {
+    script: String,
+}
+
+async fn run_script(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<RunScriptBody>,
+) -> Result<Json<crate::scripts::ScriptOutput>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    let repo = fetch_repository(&pool, worktree.repository_id).await?;
+
+    let script_text = match body.script.as_str() {
+        "setup" => repo.setup_script,
+        "run" => repo.run_script,
+        "test" => repo.test_script,
+        "teardown" => repo.teardown_script,
+        other => return Err(AppError::Invalid(format!("unknown script kind: {other}"))),
+    };
+    let script_text = script_text.ok_or_else(|| AppError::Invalid(format!("no {} script configured for this repository", body.script)))?;
+
+    let output = crate::scripts::run(std::path::Path::new(&worktree.path), &script_text).await?;
+    Ok(Json(output))
 }
 
 // --- agent definitions + detection (Rung 4 / phase-r3, phase-r9.2/9.3) ---

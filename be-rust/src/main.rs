@@ -6,6 +6,7 @@ mod error;
 mod git;
 mod handlers;
 mod process_manager;
+mod scripts;
 mod sessions;
 mod state;
 
