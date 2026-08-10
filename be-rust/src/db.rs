@@ -76,7 +76,13 @@ pub async fn create_card(
 
     let mut tx = pool.begin().await?;
 
-    sqlx::query("INSERT INTO cards (id, title, repo_path, branch, agent) VALUES ($1, $2, $3, $4, $5)")
+    // $5::agent_type: write-side analog of the CARD_COLUMNS ::text casts
+    // above. sqlx binds a Rust &str parameter with an explicit text OID,
+    // and Postgres will not implicitly cast text -> a custom enum type in
+    // that position, so the bind must be cast explicitly. Only `agent` is
+    // affected here; `id`/`title`/`repo_path`/`branch` are plain TEXT
+    // columns.
+    sqlx::query("INSERT INTO cards (id, title, repo_path, branch, agent) VALUES ($1, $2, $3, $4, $5::agent_type)")
         .bind(&card_id)
         .bind(title)
         .bind(repo_path)
