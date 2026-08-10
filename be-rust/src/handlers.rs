@@ -16,7 +16,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/workspaces/:id/repositories", get(list_repositories))
         .route("/repositories", post(create_repository))
         .route("/repositories/:id", get(get_repository))
-        .route("/repositories/:id/worktrees", post(create_worktree))
+        .route("/repositories/:id/worktrees", get(list_worktrees).post(create_worktree))
         .route("/worktrees/:id", get(get_worktree).delete(delete_worktree))
         .route("/worktrees/:id/diff", get(diff_worktree))
         .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
@@ -195,6 +195,18 @@ pub(crate) async fn fetch_worktree(pool: &PgPool, id: Uuid) -> Result<Worktree, 
         .await?
         .ok_or(AppError::NotFound)?;
     Ok(worktree_from_row(&row)?)
+}
+
+async fn list_worktrees(
+    State(pool): State<PgPool>,
+    Path(repository_id): Path<Uuid>,
+) -> Result<Json<Vec<Worktree>>, AppError> {
+    let rows = sqlx::query("SELECT * FROM worktrees WHERE repository_id = $1 AND archived_at IS NULL ORDER BY created_at DESC")
+        .bind(repository_id)
+        .fetch_all(&pool)
+        .await?;
+    let worktrees: Result<Vec<Worktree>, AppError> = rows.iter().map(worktree_from_row).collect();
+    Ok(Json(worktrees?))
 }
 
 #[derive(Deserialize)]

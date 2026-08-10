@@ -1,0 +1,60 @@
+import type {
+  AgentDefinition,
+  AgentSession,
+  Diff,
+  EditorAvailability,
+  Repository,
+  TimelineEntry,
+  Worktree,
+  Workspace,
+} from './types'
+
+const BASE = '/api'
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...init?.headers },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(body.error ?? `request failed: ${res.status}`)
+  }
+  if (res.status === 204) return undefined as T
+  return res.json() as Promise<T>
+}
+
+export const api = {
+  listWorkspaces: () => request<Workspace[]>('/workspaces'),
+  createWorkspace: (body: { name: string; color?: string; icon?: string }) =>
+    request<Workspace>('/workspaces', { method: 'POST', body: JSON.stringify(body) }),
+  getWorkspace: (id: string) => request<Workspace>(`/workspaces/${id}`),
+
+  listRepositories: (workspaceId: string) => request<Repository[]>(`/workspaces/${workspaceId}/repositories`),
+  createRepository: (body: { workspaceId: string; name: string; localPath: string; remoteUrl?: string; defaultBranch?: string }) =>
+    request<Repository>('/repositories', { method: 'POST', body: JSON.stringify(body) }),
+  getRepository: (id: string) => request<Repository>(`/repositories/${id}`),
+
+  listWorktrees: (repositoryId: string) => request<Worktree[]>(`/repositories/${repositoryId}/worktrees`),
+  createWorktree: (repositoryId: string, body: { branch: string; targetBranch?: string }) =>
+    request<Worktree>(`/repositories/${repositoryId}/worktrees`, { method: 'POST', body: JSON.stringify(body) }),
+  getWorktree: (id: string) => request<Worktree>(`/worktrees/${id}`),
+  deleteWorktree: (id: string) => request<void>(`/worktrees/${id}`, { method: 'DELETE' }),
+  diffWorktree: (id: string) => request<Diff>(`/worktrees/${id}/diff`),
+
+  listAgentDefinitions: () => request<AgentDefinition[]>('/agent-definitions'),
+  createAgentDefinition: (body: { id: string; name: string; executable: string; defaultArgs: string[] }) =>
+    request<AgentDefinition>('/agent-definitions', { method: 'POST', body: JSON.stringify(body) }),
+  detectAgents: () => request<Record<string, boolean>>('/agents/detect'),
+  detectEditors: () => request<EditorAvailability>('/editors/detect'),
+
+  createSession: (
+    worktreeId: string,
+    body: { agentDefinitionId: string; model?: string; reasoningLevel?: string; prompt: string },
+  ) => request<AgentSession>(`/worktrees/${worktreeId}/sessions`, { method: 'POST', body: JSON.stringify(body) }),
+  getTimeline: (sessionId: string) => request<TimelineEntry[]>(`/sessions/${sessionId}/timeline`),
+  reply: (sessionId: string, input: string) =>
+    request<void>(`/sessions/${sessionId}/reply`, { method: 'POST', body: JSON.stringify({ input }) }),
+  eventsUrl: (sessionId: string, since?: string) =>
+    `${BASE}/sessions/${sessionId}/events${since ? `?since=${encodeURIComponent(since)}` : ''}`,
+}

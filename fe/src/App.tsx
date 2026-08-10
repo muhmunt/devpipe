@@ -1,3 +1,18 @@
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { CommandPalette } from '@/components/CommandPalette'
+import WorkspaceHome from '@/pages/WorkspaceHome'
+import RepositoryPage from '@/pages/RepositoryPage'
+import WorktreePage from '@/pages/WorktreePage'
+
 export default function App() {
-  return <div>devpipe — rebuilding (rust-rewrite in progress)</div>
+  return (
+    <BrowserRouter>
+      <CommandPalette />
+      <Routes>
+        <Route path="/" element={<WorkspaceHome />} />
+        <Route path="/workspaces/:workspaceId" element={<RepositoryPage />} />
+        <Route path="/worktrees/:id" element={<WorktreePage />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
