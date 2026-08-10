@@ -1,9 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { RefreshCw } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { StatusDot } from '@/components/StatusDot'
+import { DiffView } from '@/components/DiffView'
 import { api } from '@/lib/api'
 import type { AgentEvent, AgentSession, TimelineEntry, Worktree } from '@/lib/types'
+
+const WORKTREE_STATUS_COLOR: Record<Worktree['status'], string> = {
+  clean: 'text-success',
+  modified: 'text-warning',
+  conflicted: 'text-error',
+  ahead: 'text-accent',
+  behind: 'text-text-muted',
+}
 
 const SSE_EVENT_NAMES = [
   'session_started',
@@ -31,6 +41,8 @@ export default function WorktreePage() {
   const [agentId, setAgentId] = useState('claude')
   const [prompt, setPrompt] = useState('')
   const [agents, setAgents] = useState<Record<string, boolean>>({})
+  const [tab, setTab] = useState<'timeline' | 'diff'>('timeline')
+  const [refreshingStatus, setRefreshingStatus] = useState(false)
   const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
@@ -39,6 +51,16 @@ export default function WorktreePage() {
     api.detectAgents().then(setAgents)
     return () => esRef.current?.close()
   }, [id])
+
+  async function refreshStatus() {
+    if (!id) return
+    setRefreshingStatus(true)
+    try {
+      setWorktree(await api.getWorktree(id))
+    } finally {
+      setRefreshingStatus(false)
+    }
+  }
 
   function connectStream(sessionId: string) {
     esRef.current?.close()
@@ -92,11 +114,43 @@ export default function WorktreePage() {
         <button type="button" onClick={() => navigate(-1)} className="text-xs text-text-muted hover:text-text">
           ← Back
         </button>
-        <div className="flex items-center gap-2 mt-2 mb-6">
+        <div className="flex items-center gap-2 mt-2 mb-1">
           {session && <StatusDot status={session.status} showLabel />}
           <h1 className="text-lg font-medium font-mono">{worktree.branch}</h1>
         </div>
+        <div className="flex items-center gap-2 mb-6">
+          <span className={`text-xs font-mono ${WORKTREE_STATUS_COLOR[worktree.status]}`}>{worktree.status}</span>
+          <button
+            type="button"
+            onClick={refreshStatus}
+            className="text-text-muted hover:text-text"
+            aria-label="Refresh worktree status"
+          >
+            <RefreshCw size={12} className={refreshingStatus ? 'animate-spin' : ''} />
+          </button>
+        </div>
 
+        <div className="flex gap-4 border-b border-border mb-4 text-sm">
+          <button
+            type="button"
+            onClick={() => setTab('timeline')}
+            className={`pb-2 -mb-px border-b-2 ${tab === 'timeline' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
+          >
+            Timeline
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('diff')}
+            className={`pb-2 -mb-px border-b-2 ${tab === 'diff' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
+          >
+            Diff
+          </button>
+        </div>
+
+        {tab === 'diff' && <DiffView worktreeId={worktree.id} />}
+
+        {tab === 'timeline' && (
+          <>
         <div className="border border-border rounded-lg mb-4 p-4 space-y-3 bg-surface font-mono text-sm min-h-[200px] max-h-[420px] overflow-y-auto">
           {entries.length === 0 && <p className="text-text-muted">No session yet — launch one below.</p>}
           {entries.map((entry, i) => (
@@ -143,6 +197,8 @@ export default function WorktreePage() {
             Launch session
           </button>
         </form>
+          </>
+        )}
       </div>
     </AppShell>
   )
