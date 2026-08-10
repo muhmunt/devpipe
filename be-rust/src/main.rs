@@ -1,3 +1,5 @@
+mod domain;
+
 use axum::Router;
 
 #[tokio::main]
