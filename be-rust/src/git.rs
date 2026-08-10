@@ -227,6 +227,35 @@ pub async fn push(worktree_path: &Path, branch: &str) -> Result<()> {
     Ok(())
 }
 
+/// Cheap `+N -M` summary for a worktree against its target branch, for the
+/// sidebar. Uses `--shortstat` rather than a full diff: measured at ~117ms
+/// on a 146-file change, so it is viable to run one per worktree
+/// concurrently on a list request. Returns (0, 0) rather than erroring when
+/// the target branch is unknown, so one odd worktree can't fail the list.
+pub async fn diff_stat(worktree_path: &Path, target_branch: &str) -> (u32, u32) {
+    if validate_path(worktree_path).is_err() || validate_branch_name(target_branch).is_err() {
+        return (0, 0);
+    }
+    let range = format!("{target_branch}...HEAD");
+    let Ok(out) = run_git(worktree_path, &["diff", "--shortstat", &range]).await else {
+        return (0, 0);
+    };
+    // Example: " 12 files changed, 340 insertions(+), 12 deletions(-)"
+    let mut additions = 0;
+    let mut deletions = 0;
+    for part in out.split(',') {
+        let part = part.trim();
+        let Some((count, _)) = part.split_once(' ') else { continue };
+        let Ok(n) = count.parse::<u32>() else { continue };
+        if part.contains("insertion") {
+            additions = n;
+        } else if part.contains("deletion") {
+            deletions = n;
+        }
+    }
+    (additions, deletions)
+}
+
 /// Tracked files + untracked-but-not-ignored files — i.e. exactly what a
 /// developer would see as "real" files in the worktree, `.gitignore`
 /// respected automatically, without walking heavy ignored directories

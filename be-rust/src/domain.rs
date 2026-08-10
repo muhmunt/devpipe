@@ -124,6 +124,12 @@ pub struct Worktree {
     pub archived_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Populated only by the list endpoint (sidebar `+N -M`). Left as None
+    /// elsewhere so single-worktree reads don't pay for a git diff.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additions: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deletions: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

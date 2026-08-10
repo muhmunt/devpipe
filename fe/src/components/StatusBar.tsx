@@ -16,10 +16,10 @@ const STATUS_COLOR: Record<Worktree['status'], string> = {
 export function StatusBar({ worktree, onChange }: { worktree: Worktree; onChange: (wt: Worktree) => void }) {
   return (
     <div className="flex items-center justify-between w-full">
-      <div className="flex items-center gap-1.5 text-text-muted">
-        <GitBranch size={12} />
-        <span className="font-mono">{worktree.branch}</span>
-        <span className={`font-mono ${STATUS_COLOR[worktree.status]}`}>· {worktree.status}</span>
+      <div className="flex items-center gap-1.5 min-w-0">
+        <GitBranch size={11} className="text-text-faint shrink-0" />
+        <span className="font-mono text-text-muted truncate">{worktree.branch}</span>
+        <span className={`font-mono shrink-0 ${STATUS_COLOR[worktree.status]}`}>{worktree.status}</span>
       </div>
       <GitActionBar worktree={worktree} onChange={onChange} compact />
     </div>

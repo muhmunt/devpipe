@@ -75,6 +75,8 @@ pub(crate) fn worktree_from_row(row: &sqlx::postgres::PgRow) -> Result<Worktree,
         archived_at: row.get("archived_at"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),
+        additions: None,
+        deletions: None,
     })
 }
 
@@ -407,8 +409,27 @@ async fn list_worktrees(
         .bind(repository_id)
         .fetch_all(&pool)
         .await?;
-    let worktrees: Result<Vec<Worktree>, AppError> = rows.iter().map(worktree_from_row).collect();
-    Ok(Json(worktrees?))
+    let worktrees: Vec<Worktree> = rows.iter().map(worktree_from_row).collect::<Result<_, _>>()?;
+
+    // Diff stats for the sidebar, computed concurrently: one cheap
+    // `git diff --shortstat` per worktree rather than N sequential calls.
+    let stats = futures::future::join_all(worktrees.iter().map(|wt| {
+        let path = wt.path.clone();
+        let target = wt.target_branch.clone().unwrap_or_else(|| "main".to_string());
+        async move { crate::git::diff_stat(std::path::Path::new(&path), &target).await }
+    }))
+    .await;
+
+    let worktrees = worktrees
+        .into_iter()
+        .zip(stats)
+        .map(|(mut wt, (additions, deletions))| {
+            wt.additions = Some(additions);
+            wt.deletions = Some(deletions);
+            wt
+        })
+        .collect();
+    Ok(Json(worktrees))
 }
 
 #[derive(Deserialize)]

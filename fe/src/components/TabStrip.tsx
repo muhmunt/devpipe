@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { GitBranch, X } from 'lucide-react'
 import { getTabs, removeTab, type OpenTab } from '@/lib/tabs'
 
-// spec §21 tab strip — real open worktree tabs (added by Sidebar when a
-// worktree is opened), not decoration. Closable; closing the active tab
-// navigates to the next remaining one, or home if none left.
+// Open worktree tabs. Active tab carries an accent underline, matching the
+// reference. Closing the active tab moves to the next remaining one.
 export function TabStrip() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -23,36 +22,36 @@ export function TabStrip() {
     const wasActive = location.pathname === `/worktrees/${id}`
     removeTab(id)
     const remaining = getTabs()
-    if (wasActive) {
-      navigate(remaining.length > 0 ? `/worktrees/${remaining[remaining.length - 1].id}` : '/')
-    }
+    if (wasActive) navigate(remaining.length ? `/worktrees/${remaining[remaining.length - 1].id}` : '/')
   }
 
-  if (tabs.length === 0) {
-    return <div className="border-b border-border h-[32px]" />
-  }
+  if (tabs.length === 0) return <div className="h-9 border-b border-border" />
 
   return (
-    <div className="flex items-center border-b border-border overflow-x-auto">
+    <div className="flex items-stretch h-9 border-b border-border overflow-x-auto" role="tablist">
       {tabs.map((tab) => {
         const active = location.pathname === `/worktrees/${tab.id}`
         return (
           <Link
             key={tab.id}
             to={`/worktrees/${tab.id}`}
-            className={`group flex items-center gap-2 h-[32px] px-3 border-r border-border text-xs font-mono whitespace-nowrap ${
-              active ? 'bg-background text-text' : 'text-text-muted hover:text-text hover:bg-surface-elevated'
+            role="tab"
+            aria-selected={active}
+            className={`group relative flex items-center gap-1.5 px-3 whitespace-nowrap transition-colors ${
+              active ? 'text-text' : 'text-text-muted hover:text-text hover:bg-surface-hover'
             }`}
           >
-            <span className="truncate max-w-[140px]">{tab.branch}</span>
+            <GitBranch size={12} className={active ? 'text-accent' : 'text-text-faint'} />
+            <span className="font-mono text-[12px] truncate max-w-[150px]">{tab.branch}</span>
             <button
               type="button"
               onClick={(e) => close(e, tab.id)}
-              className="opacity-0 group-hover:opacity-100 hover:text-error"
               aria-label={`Close ${tab.branch}`}
+              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-error transition-opacity"
             >
               <X size={11} />
             </button>
+            {active && <span className="absolute left-0 right-0 bottom-0 h-[2px] bg-accent" aria-hidden />}
           </Link>
         )
       })}

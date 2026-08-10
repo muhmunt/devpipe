@@ -3,36 +3,44 @@
 @import "@fontsource-variable/jetbrains-mono";
 
 /* devpipe design tokens
+ * Restyled against the Superconductor reference screenshots.
  * Read: IDE cockpit for developers running parallel coding agents.
  * Dials: variance 3 (structured chrome) / motion 3 (feedback only) / density 8.
- * One accent, locked, used identically everywhere. Elevation is carried by
- * surface steps plus hairline borders, never drop shadows.
+ *
+ * Two accents with distinct jobs, matching the reference's structure:
+ *   accent (blue)  = selection and active state. Never a button fill.
+ *   action (orange) = the single primary action. Never a selection state.
+ * Elevation comes from surface steps plus hairlines, never drop shadows.
+ * Every pairing below was contrast-measured; see the comments.
  */
 @theme {
   --font-ui: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
 
-  /* Warm neutral ramp. Off-black, never #000 — pure black kills depth. */
-  --color-background: #171614;
-  --color-surface: #1e1d1a;
-  --color-surface-elevated: #262521;
-  --color-surface-hover: #2e2c28;
-  --color-border: #35332e;
-  --color-border-strong: #46433c;
-  --color-text: #f0eee9;
-  --color-text-muted: #9a958c;
-  --color-text-faint: #847f76;
+  /* Neutral ramp. Off-black, never #000: pure black flattens depth. */
+  --color-background: #1a1a1c;
+  --color-surface: #202023;
+  --color-surface-elevated: #27272b;
+  --color-surface-hover: #2f2f34;
+  --color-border: #303035;
+  --color-border-strong: #3f3f46;
 
-  /* Single locked accent: warm clay. `accent` for text/icons on dark,
-     `accent-strong` for filled buttons carrying white label text. */
-  --color-accent: #d9825e;
-  /* Verified: white label on this passes WCAG AA (4.9:1). */
-  --color-accent-strong: #b45530;
-  --color-accent-soft: #2a1e18;
+  --color-text: #ededf0;        /* 14.9:1 on bg */
+  --color-text-muted: #a1a1a8;  /* 6.8:1 on bg */
+  --color-text-faint: #98989f;  /* 4.65:1 on surface-hover, the worst case */
 
-  --color-success: #7fb069;
+  /* Selection / active state. */
+  --color-accent: #6ba1f8;      /* 5.1:1 on surface-hover, the worst case */
+  --color-accent-soft: #16233a; /* selected-row fill; accent reads 4.8:1 on it */
+
+  /* Primary action. Only ever a filled background carrying a white label,
+     measured at 4.6:1. There is no text-coloured variant because nothing
+     uses one. */
+  --color-action-strong: #b85a2b;
+
+  --color-success: #5cb85c;     /* additions */
+  --color-error: #ef7c78;       /* deletions; 4.96:1 on surface-hover */
   --color-warning: #d9a441;
-  --color-error: #d96a5f;
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -42,18 +50,21 @@
 }
 
 .light {
-  --color-background: #faf9f7;
+  --color-background: #f7f7f8;
   --color-surface: #ffffff;
   --color-surface-elevated: #ffffff;
-  --color-surface-hover: #f2f0ec;
-  --color-border: #e3e0da;
-  --color-border-strong: #cfcbc2;
-  --color-text: #1c1a17;
-  --color-text-muted: #6b665e;
-  --color-text-faint: #726d65;
-  --color-accent: #b8532f;
-  --color-accent-strong: #b8532f;
-  --color-accent-soft: #f7ece6;
+  --color-surface-hover: #efeff1;
+  --color-border: #e0e0e4;
+  --color-border-strong: #c9c9d0;
+  --color-text: #17171a;
+  --color-text-muted: #5c5c66;
+  --color-text-faint: #616169;
+  --color-accent: #1b63d8;
+  --color-accent-soft: #e6eeff;
+  --color-action-strong: #a8501f;
+  --color-success: #26682b;
+  --color-error: #c0392b;
+  --color-warning: #7d5200;
 }
 
 html, body, #root {
@@ -73,12 +84,13 @@ body {
   border-color: var(--color-border);
 }
 
-/* Tabular numerals everywhere numbers are compared or scanned. */
+/* Tabular numerals wherever numbers are scanned or compared
+   (diff stats, counts, durations). */
 .tnum {
   font-variant-numeric: tabular-nums;
 }
 
-/* Focus ring: always visible, never animated in. */
+/* Focus ring: instant, never animated in. */
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
@@ -108,8 +120,8 @@ body {
   background: transparent;
 }
 
-/* Translucent chrome for the shell edges (sidebar, bars). Content panels
-   stay opaque so text never sits on a moving backdrop. */
+/* Translucent chrome for shell edges. Content panels stay opaque so text
+   never sits on a moving backdrop. */
 .chrome {
   background: color-mix(in srgb, var(--color-surface) 88%, transparent);
   backdrop-filter: blur(18px) saturate(1.3);
@@ -141,6 +153,47 @@ body {
   transform: translateX(-100%);
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-text) 6%, transparent), transparent);
   animation: shimmer 1.4s infinite;
+}
+
+/* Markdown rendering inside agent transcript turns. */
+.md > * + * { margin-top: 0.75rem; }
+.md h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
+.md h2 { font-size: 1.05rem; font-weight: 600; }
+.md h3 { font-size: 0.95rem; font-weight: 600; }
+.md p, .md li { line-height: 1.65; }
+.md ul { list-style: disc; padding-left: 1.15rem; }
+.md ol { list-style: decimal; padding-left: 1.35rem; }
+.md li + li { margin-top: 0.3rem; }
+.md a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; }
+.md strong { font-weight: 600; color: var(--color-text); }
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.08em 0.32em;
+}
+.md pre {
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.md pre code { background: none; border: 0; padding: 0; font-size: 0.85rem; }
+.md table { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+.md th, .md td {
+  border: 1px solid var(--color-border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.md th { background: var(--color-surface-elevated); font-weight: 600; }
+.md blockquote {
+  border-left: 2px solid var(--color-border-strong);
+  padding-left: 0.75rem;
+  color: var(--color-text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

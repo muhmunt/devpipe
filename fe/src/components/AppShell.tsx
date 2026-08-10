@@ -29,7 +29,7 @@ export function AppShell({
 
   return (
     <div className="h-full grid grid-rows-[1fr_auto] bg-background text-text">
-      <div className={`grid min-h-0 ${rightPanel ? 'grid-cols-[auto_1fr_280px]' : 'grid-cols-[auto_1fr]'}`}>
+      <div className={`grid min-h-0 ${rightPanel ? 'grid-cols-[auto_1fr_300px]' : 'grid-cols-[auto_1fr]'}`}>
         <aside
           className={`chrome border-r border-border flex flex-col transition-[width] duration-200 ${
             collapsed ? 'w-0 overflow-hidden' : 'w-[240px]'
@@ -38,7 +38,7 @@ export function AppShell({
         >
           <Sidebar />
         </aside>
-        <div className="grid grid-rows-[36px_32px_1fr] min-w-0">
+        <div className="grid grid-rows-[36px_auto_1fr] min-w-0">
           <div className="chrome flex items-center justify-between border-b border-border px-3">
             <button
               type="button"
@@ -56,7 +56,7 @@ export function AppShell({
         {rightPanel && <aside className="chrome border-l border-border overflow-y-auto">{rightPanel}</aside>}
       </div>
       {statusBar && (
-        <div className="chrome h-[28px] border-t border-border flex items-center px-3 text-xs">{statusBar}</div>
+        <div className="chrome h-[26px] border-t border-border flex items-center px-3 text-[11px]">{statusBar}</div>
       )}
     </div>
   )

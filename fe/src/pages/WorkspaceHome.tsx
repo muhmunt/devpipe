@@ -181,7 +181,7 @@ export default function WorkspaceHome() {
                 <button
                   type="submit"
                   disabled={!canSubmit || busy}
-                  className="flex items-center gap-1.5 bg-accent-strong text-white px-3 py-1.5 rounded-md font-medium transition-transform active:translate-y-px disabled:opacity-40 disabled:active:translate-y-0"
+                  className="flex items-center gap-1.5 bg-action-strong text-white px-3 py-1.5 rounded-md font-medium transition-transform active:translate-y-px disabled:opacity-40 disabled:active:translate-y-0"
                 >
                   {busy ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
                   {busy ? (source === 'clone' ? 'Cloning' : 'Opening') : source === 'clone' ? 'Clone' : 'Open'}

@@ -40,6 +40,9 @@ export type Worktree = {
   archivedAt: string | null
   createdAt: string
   updatedAt: string
+  /** Present only on the list endpoint (sidebar diff stats). */
+  additions?: number
+  deletions?: number
 }
 
 export type AgentDefinition = {

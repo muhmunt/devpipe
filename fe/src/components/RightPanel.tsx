@@ -3,6 +3,7 @@ import { GitCommitHorizontal } from 'lucide-react'
 import { DiffView } from '@/components/DiffView'
 import { FilesPanel } from '@/components/FilesPanel'
 import { RepoScriptsPanel } from '@/components/RepoScriptsPanel'
+import { SkeletonRows } from '@/components/Skeleton'
 import { api } from '@/lib/api'
 import type { Commit, Repository } from '@/lib/types'
 
@@ -11,68 +12,97 @@ function CommitsList({ worktreeId }: { worktreeId: string }) {
 
   useEffect(() => {
     setCommits(null)
-    api.listCommits(worktreeId).then(setCommits)
+    api.listCommits(worktreeId).then(setCommits).catch(() => setCommits([]))
   }, [worktreeId])
 
-  if (!commits) return <p className="text-xs text-text-muted p-3">Loading...</p>
-  if (commits.length === 0) return <p className="text-xs text-text-muted p-3">No commits yet.</p>
+  if (!commits) return <SkeletonRows rows={6} className="p-2" />
+  if (commits.length === 0) return <p className="p-3 text-[12px] text-text-faint">No commits yet.</p>
 
   return (
-    <div className="divide-y divide-border">
+    <ul>
       {commits.map((c) => (
-        <div key={c.hash} className="px-3 py-2 flex items-start gap-2">
-          <GitCommitHorizontal size={12} className="text-text-muted mt-0.5 shrink-0" />
+        <li key={c.hash} className="flex items-start gap-2 px-3 py-1.5 hover:bg-surface-hover transition-colors">
+          <GitCommitHorizontal size={12} className="text-text-faint mt-[3px] shrink-0" />
           <div className="min-w-0">
-            <div className="text-xs truncate">{c.message}</div>
-            <div className="text-[10px] font-mono text-text-muted">
+            <p className="truncate text-[12px]">{c.message}</p>
+            <p className="text-[11px] font-mono text-text-faint tnum">
               {c.hash} · {c.author} · {c.date}
-            </div>
+            </p>
           </div>
-        </div>
+        </li>
       ))}
-    </div>
+    </ul>
   )
 }
 
-const TABS = ['files', 'diff', 'commits', 'scripts'] as const
-type PanelTab = (typeof TABS)[number]
+type PanelTab = 'files' | 'changes' | 'commits' | 'scripts'
 
-// spec §86 right panel — Files/Changes/Commits (reference's "Review" tab is
-// the same diff data as "Changes", so it isn't duplicated as a 4th tab;
-// "Checks" is omitted entirely — no CI integration exists to back it, and
-// showing an empty tab forever would be worse than not having it).
-export function RightPanel({ worktreeId, repository, onRepositoryChange }: { worktreeId: string; repository: Repository | null; onRepositoryChange: (r: Repository) => void }) {
+// Right panel per the reference: pill tabs carrying live counts, dense rows.
+// "Checks" and "Review" from the reference are deliberately absent: devpipe
+// has no CI or review integration, so those tabs would have nothing behind
+// them.
+export function RightPanel({
+  worktreeId,
+  repository,
+  onRepositoryChange,
+}: {
+  worktreeId: string
+  repository: Repository | null
+  onRepositoryChange: (r: Repository) => void
+}) {
   const [tab, setTab] = useState<PanelTab>('files')
+  const [changeCount, setChangeCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    setChangeCount(null)
+    api
+      .diffWorktree(worktreeId)
+      .then((d) => setChangeCount(d.files.length))
+      .catch(() => setChangeCount(null))
+  }, [worktreeId])
+
+  const tabs: { key: PanelTab; label: string; count?: number | null }[] = [
+    { key: 'files', label: 'Files' },
+    { key: 'changes', label: 'Changes', count: changeCount },
+    { key: 'commits', label: 'Commits' },
+    { key: 'scripts', label: 'Scripts' },
+  ]
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex border-b border-border text-xs">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`flex-1 py-2 capitalize border-b-2 ${
-              tab === t ? 'border-accent text-text' : 'border-transparent text-text-muted hover:text-text'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+      <div className="flex items-center gap-1 px-2 h-9 shrink-0 border-b border-border" role="tablist">
+        {tabs.map((t) => {
+          const active = tab === t.key
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.key)}
+              className={`px-2 py-0.5 rounded-md text-[12px] transition-colors ${
+                active ? 'bg-surface-hover text-text' : 'text-text-muted hover:text-text'
+              }`}
+            >
+              {t.label}
+              {t.count != null && <span className="ml-1 text-text-faint tnum">{t.count}</span>}
+            </button>
+          )
+        })}
       </div>
+
       <div className="flex-1 overflow-y-auto">
         {tab === 'files' && <FilesPanel worktreeId={worktreeId} />}
-        {tab === 'diff' && (
-          <div className="p-2">
-            <DiffView worktreeId={worktreeId} />
-          </div>
-        )}
+        {tab === 'changes' && <DiffView worktreeId={worktreeId} />}
         {tab === 'commits' && <CommitsList worktreeId={worktreeId} />}
-        {tab === 'scripts' && repository && (
-          <div className="p-2">
-            <RepoScriptsPanel repository={repository} worktreeId={worktreeId} onRepositoryChange={onRepositoryChange} />
-          </div>
-        )}
+        {tab === 'scripts' &&
+          (repository ? (
+            <div className="p-2">
+              <RepoScriptsPanel repository={repository} worktreeId={worktreeId} onRepositoryChange={onRepositoryChange} />
+            </div>
+          ) : (
+            <SkeletonRows rows={4} className="p-2" />
+          ))}
       </div>
     </div>
   )

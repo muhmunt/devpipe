@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, File, Folder } from 'lucide-react'
+import { SkeletonRows } from '@/components/Skeleton'
 import { api } from '@/lib/api'
 
 type TreeNode = { name: string; path: string; children?: Map<string, TreeNode> }
@@ -31,8 +32,11 @@ function TreeView({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
 
   if (!isDir) {
     return (
-      <div className="flex items-center gap-1.5 py-0.5 text-sm font-mono text-text-muted" style={{ paddingLeft: depth * 14 }}>
-        <File size={12} className="shrink-0" />
+      <div
+        className="flex items-center gap-1.5 h-6 text-[12px] text-text-muted hover:bg-surface-hover transition-colors"
+        style={{ paddingLeft: depth * 12 + 10 }}
+      >
+        <File size={11} className="shrink-0 text-text-faint" />
         <span className="truncate">{node.name}</span>
       </div>
     )
@@ -49,11 +53,11 @@ function TreeView({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-1 py-0.5 text-sm font-mono w-full text-left hover:text-text"
-          style={{ paddingLeft: (depth - 1) * 14 }}
+          className="flex items-center gap-1 h-6 text-[12px] w-full text-left hover:bg-surface-hover transition-colors"
+          style={{ paddingLeft: (depth - 1) * 12 + 10 }}
         >
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          <Folder size={12} />
+          {open ? <ChevronDown size={11} className="shrink-0 text-text-faint" /> : <ChevronRight size={11} className="shrink-0 text-text-faint" />}
+          <Folder size={11} className="shrink-0 text-text-faint" />
           <span className="truncate">{node.name}</span>
         </button>
       )}
@@ -78,12 +82,12 @@ export function FilesPanel({ worktreeId }: { worktreeId: string }) {
 
   const tree = useMemo(() => (paths ? buildTree(paths) : null), [paths])
 
-  if (error) return <p className="text-sm text-error p-4">{error}</p>
-  if (!tree) return <p className="text-sm text-text-muted p-4">Loading files...</p>
-  if (paths?.length === 0) return <p className="text-sm text-text-muted p-4">No files.</p>
+  if (error) return <p className="p-3 text-[12px] text-error">{error}</p>
+  if (!tree) return <SkeletonRows rows={8} className="p-2" />
+  if (paths?.length === 0) return <p className="p-3 text-[12px] text-text-faint">No files.</p>
 
   return (
-    <div className="border border-border rounded-lg p-3 max-h-[500px] overflow-y-auto">
+    <div className="py-1">
       <TreeView node={tree} />
     </div>
   )

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
-import { StatusDot } from '@/components/StatusDot'
-import { CommandMenu } from '@/components/CommandMenu'
+import { Composer } from '@/components/Composer'
+import { Markdown } from '@/components/Markdown'
 import { RightPanel } from '@/components/RightPanel'
 import { StatusBar } from '@/components/StatusBar'
 import { api } from '@/lib/api'
@@ -161,111 +161,102 @@ export default function WorktreePage() {
       rightPanel={<RightPanel worktreeId={worktree.id} repository={repository} onRepositoryChange={setRepository} />}
       statusBar={<StatusBar worktree={worktree} onChange={setWorktree} />}
     >
-      <div className="p-6 max-w-[820px] mx-auto">
-        <div className="flex items-center gap-2 mb-6">
-          {session && <StatusDot status={session.status} showLabel />}
-          <h1 className="text-lg font-medium font-mono">{worktree.branch}</h1>
-        </div>
-
-        <div className="border border-border rounded-lg mb-4 p-4 space-y-3 bg-surface font-mono text-sm min-h-[300px] max-h-[520px] overflow-y-auto">
-          {entries.length === 0 && <p className="text-text-muted">No session yet. Launch one below.</p>}
-          {entries.map((entry, i) =>
-            entry.type === 'message' && 'role' in entry ? (
-              <div key={i} className="whitespace-pre-wrap">
-                <span className="text-accent">{String(entry.role)}: </span>
-                {String((entry as { text: string }).text)}
-              </div>
-            ) : entry.type === 'needs_input' ? (
-              <div key={i} className="border border-warning/40 bg-warning/10 rounded-md px-3 py-2 text-warning">
-                <span className="font-medium">Needs input: </span>
-                {String((entry as { question?: string }).question ?? '')}
-              </div>
-            ) : (
-              <div key={i} className="whitespace-pre-wrap text-text-muted">
-                [{entry.type}] {JSON.stringify(entry)}
-              </div>
-            ),
-          )}
-        </div>
-
-        {session?.status === 'failed' && (
-          <div className="flex items-center gap-2 mb-4 border border-error/40 bg-error/10 rounded-md px-3 py-2">
-            <span className="text-error text-sm flex-1">
-              Session failed{session.exitCode !== null ? ` (exit ${session.exitCode})` : ''}.
-            </span>
-            <button
-              type="button"
-              onClick={restart}
-              disabled={!lastLaunchRef.current}
-              className="text-xs bg-surface-elevated border border-border rounded-md px-2 py-1 hover:border-accent disabled:opacity-40"
-            >
-              Restart
-            </button>
-            <button
-              type="button"
-              onClick={deleteWorktree}
-              disabled={deleting}
-              className="text-xs bg-surface-elevated border border-border rounded-md px-2 py-1 hover:border-error disabled:opacity-40"
-            >
-              Delete worktree
-            </button>
-          </div>
-        )}
-
-        <form onSubmit={submitComposer} className="space-y-2">
-          {session?.status !== 'needs_input' && (
-            <div className="flex gap-2">
-              <select
-                value={agentId}
-                onChange={(e) => setAgentId(e.target.value)}
-                className="bg-surface border border-border rounded-md px-2 py-2 text-sm outline-none"
-              >
-                {Object.entries(agents).map(([id, available]) => (
-                  <option key={id} value={id} disabled={!available}>
-                    {id} {available ? '' : '(not detected)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {composerError && <p className="text-error text-xs">{composerError}</p>}
-          <div className="relative">
-            {prompt.startsWith('/') && repository && (
-              <CommandMenu
-                query={prompt.slice(1)}
-                workspaceId={repository.workspaceId}
-                repositoryId={repository.id}
-                onSelect={(text) => {
-                  setPrompt(text)
-                  composerRef.current?.focus()
-                }}
-              />
+      <div className="h-full flex flex-col">
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[760px] px-6 py-6 space-y-5">
+            {entries.length === 0 && (
+              <p className="text-text-faint text-center py-16">No session yet. Describe a task below to start one.</p>
             )}
-            <textarea
-              ref={composerRef}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                // ⌘Enter / Ctrl+Enter (spec §29) — submit without leaving the textarea.
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                  e.preventDefault()
-                  e.currentTarget.form?.requestSubmit()
+
+            {entries.map((entry, i) => {
+              if (entry.type === 'message' && 'role' in entry) {
+                const role = String(entry.role)
+                const text = String((entry as { text: string }).text)
+                if (role === 'user') {
+                  return (
+                    <div key={i} className="flex justify-end">
+                      <div className="max-w-[85%] rounded-xl bg-surface-elevated px-3.5 py-2 whitespace-pre-wrap">{text}</div>
+                    </div>
+                  )
                 }
-              }}
-              placeholder={session?.status === 'needs_input' ? 'Answer the agent...' : 'Describe the task... (try "/")'}
-              rows={3}
-              disabled={session?.status === 'running' || session?.status === 'starting'}
-              className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent disabled:opacity-50"
+                return (
+                  <div key={i}>
+                    <p className="text-[11px] text-text-faint mb-1.5">{session?.agentDefinitionId ?? role}</p>
+                    <Markdown text={text} />
+                  </div>
+                )
+              }
+
+              if (entry.type === 'needs_input') {
+                return (
+                  <div key={i} className="border border-warning/40 bg-warning/10 rounded-lg px-3 py-2 text-warning">
+                    <span className="font-medium">Needs input: </span>
+                    {String((entry as { question?: string }).question ?? '')}
+                  </div>
+                )
+              }
+
+              if (entry.type === 'tool_output' || entry.type === 'tool_started') {
+                const label = String((entry as { tool?: string }).tool ?? entry.type)
+                const output = String((entry as { output?: string }).output ?? '')
+                return (
+                  <div key={i} className="border border-border rounded-lg overflow-hidden">
+                    <p className="px-3 py-1 bg-surface-elevated text-[11px] font-mono text-text-muted">{label}</p>
+                    {output && <pre className="px-3 py-2 text-[11px] font-mono whitespace-pre-wrap text-text-muted">{output}</pre>}
+                  </div>
+                )
+              }
+
+              return (
+                <p key={i} className="text-[11px] font-mono text-text-faint">
+                  {entry.type}
+                </p>
+              )
+            })}
+
+            {session?.status === 'failed' && (
+              <div className="flex items-center gap-2 border border-error/40 bg-error/10 rounded-lg px-3 py-2">
+                <span className="text-error flex-1">
+                  Session failed{session.exitCode !== null ? ` (exit ${session.exitCode})` : ''}.
+                </span>
+                <button
+                  type="button"
+                  onClick={restart}
+                  disabled={!lastLaunchRef.current}
+                  className="text-[12px] bg-surface-elevated border border-border rounded-md px-2 py-1 hover:border-accent disabled:opacity-40 transition-colors"
+                >
+                  Restart
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteWorktree}
+                  disabled={deleting}
+                  className="text-[12px] bg-surface-elevated border border-border rounded-md px-2 py-1 hover:border-error disabled:opacity-40 transition-colors"
+                >
+                  Delete worktree
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="shrink-0 border-t border-border px-6 py-3">
+          <div className="mx-auto w-full max-w-[760px]">
+            <Composer
+              value={prompt}
+              onChange={setPrompt}
+              onSubmit={submitComposer}
+              textareaRef={composerRef}
+              agents={agents}
+              agentId={agentId}
+              onAgentChange={setAgentId}
+              repository={repository}
+              busy={session?.status === 'running' || session?.status === 'starting'}
+              replying={session?.status === 'needs_input'}
+              error={composerError}
             />
           </div>
-          <button
-            type="submit"
-            disabled={session?.status === 'running' || session?.status === 'starting'}
-            className="bg-accent-strong text-white px-3 py-2 rounded-md text-sm disabled:opacity-50"
-          >
-            {session?.status === 'needs_input' ? 'Reply' : 'Launch session'}
-          </button>
-        </form>
+        </div>
       </div>
     </AppShell>
   )
