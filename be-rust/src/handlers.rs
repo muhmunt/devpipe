@@ -21,6 +21,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/worktrees/:id/diff", get(diff_worktree))
         .route("/worktrees/:id/commit", post(commit_worktree))
         .route("/worktrees/:id/push", post(push_worktree))
+        .route("/worktrees/:id/files", get(list_files))
         .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
         .route("/agents/detect", get(detect_agents))
         .route("/editors/detect", get(detect_editors))
@@ -309,6 +310,12 @@ async fn push_worktree(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Resu
     let worktree = fetch_worktree(&pool, id).await?;
     crate::git::push(std::path::Path::new(&worktree.path), &worktree.branch).await?;
     Ok(Json(refresh_worktree_status(&pool, &worktree).await?))
+}
+
+async fn list_files(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Json<Vec<String>>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    let files = crate::git::list_files(std::path::Path::new(&worktree.path)).await?;
+    Ok(Json(files))
 }
 
 // --- agent definitions + detection (Rung 4 / phase-r3, phase-r9.2/9.3) ---

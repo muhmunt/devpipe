@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { StatusDot } from '@/components/StatusDot'
 import { DiffView } from '@/components/DiffView'
+import { FilesPanel } from '@/components/FilesPanel'
 import { GitActionBar } from '@/components/GitActionBar'
 import { api } from '@/lib/api'
 import type { AgentEvent, AgentSession, TimelineEntry, Worktree } from '@/lib/types'
@@ -30,9 +31,9 @@ const SSE_EVENT_NAMES = [
   'session_error',
 ]
 
-// spec §86 Worktree screen — Timeline / Diff / Files / Git tabs. Timeline
-// tab only implemented so far (Rung 5's real backend surface); other tabs
-// land once their backend endpoints exist.
+// spec §86 Worktree screen — Timeline / Diff / Files tabs, plus the git
+// action bar. Editor handoff / workspace scripts / custom commands still
+// pending their own backend endpoints.
 export default function WorktreePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -42,7 +43,7 @@ export default function WorktreePage() {
   const [agentId, setAgentId] = useState('claude')
   const [prompt, setPrompt] = useState('')
   const [agents, setAgents] = useState<Record<string, boolean>>({})
-  const [tab, setTab] = useState<'timeline' | 'diff'>('timeline')
+  const [tab, setTab] = useState<'timeline' | 'diff' | 'files'>('timeline')
   const [refreshingStatus, setRefreshingStatus] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [composerError, setComposerError] = useState<string | null>(null)
@@ -190,9 +191,17 @@ export default function WorktreePage() {
           >
             Diff
           </button>
+          <button
+            type="button"
+            onClick={() => setTab('files')}
+            className={`pb-2 -mb-px border-b-2 ${tab === 'files' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
+          >
+            Files
+          </button>
         </div>
 
         {tab === 'diff' && <DiffView worktreeId={worktree.id} />}
+        {tab === 'files' && <FilesPanel worktreeId={worktree.id} />}
 
         {tab === 'timeline' && (
           <>

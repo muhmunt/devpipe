@@ -185,3 +185,17 @@ pub async fn push(worktree_path: &Path, branch: &str) -> Result<()> {
     run_git(worktree_path, &["push", "-u", "origin", branch]).await?;
     Ok(())
 }
+
+/// Tracked files + untracked-but-not-ignored files — i.e. exactly what a
+/// developer would see as "real" files in the worktree, `.gitignore`
+/// respected automatically, without walking heavy ignored directories
+/// (node_modules, target, ...) the way a raw filesystem walk would.
+pub async fn list_files(worktree_path: &Path) -> Result<Vec<String>> {
+    validate_path(worktree_path)?;
+    let tracked = run_git(worktree_path, &["ls-files"]).await?;
+    let untracked = run_git(worktree_path, &["ls-files", "--others", "--exclude-standard"]).await?;
+    let mut paths: Vec<String> = tracked.lines().chain(untracked.lines()).map(str::to_string).collect();
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
+}
