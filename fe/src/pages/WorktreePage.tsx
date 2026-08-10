@@ -43,6 +43,10 @@ export default function WorktreePage() {
   const [agents, setAgents] = useState<Record<string, boolean>>({})
   const [tab, setTab] = useState<'timeline' | 'diff'>('timeline')
   const [refreshingStatus, setRefreshingStatus] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [composerError, setComposerError] = useState<string | null>(null)
+  const lastLaunchRef = useRef<{ agentId: string; prompt: string } | null>(null)
+  const composerRef = useRef<HTMLTextAreaElement>(null)
   const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
@@ -91,19 +95,57 @@ export default function WorktreePage() {
         if (ev.type === 'session_completed' || ev.type === 'session_error') {
           setSession((s) => (s ? { ...s, status: ev.type === 'session_completed' ? 'completed' : 'failed' } : s))
         }
+        if (ev.type === 'needs_input') {
+          setSession((s) => (s ? { ...s, status: 'needs_input' } : s))
+          setTimeout(() => composerRef.current?.focus(), 0)
+        }
       }
       return next
     })
   }
 
-  async function launch(e: React.FormEvent) {
-    e.preventDefault()
+  async function launchNew(agentId: string, prompt: string) {
     if (!id || !prompt.trim()) return
+    lastLaunchRef.current = { agentId, prompt }
     setEntries([])
     const created = await api.createSession(id, { agentDefinitionId: agentId, prompt: prompt.trim() })
     setSession(created)
-    setPrompt('')
     connectStream(created.id)
+  }
+
+  async function submitComposer(e: React.FormEvent) {
+    e.preventDefault()
+    if (!prompt.trim()) return
+    setComposerError(null)
+    try {
+      if (session?.status === 'needs_input') {
+        const text = prompt.trim()
+        setPrompt('')
+        await api.reply(session.id, text)
+        setSession((s) => (s ? { ...s, status: 'running' } : s))
+        return
+      }
+      await launchNew(agentId, prompt)
+      setPrompt('')
+    } catch (err) {
+      setComposerError(String((err as Error).message ?? err))
+    }
+  }
+
+  async function restart() {
+    if (!lastLaunchRef.current) return
+    await launchNew(lastLaunchRef.current.agentId, lastLaunchRef.current.prompt)
+  }
+
+  async function deleteWorktree() {
+    if (!worktree) return
+    setDeleting(true)
+    try {
+      await api.deleteWorktree(worktree.id)
+      navigate(-1)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (!worktree) return null
@@ -153,38 +195,69 @@ export default function WorktreePage() {
           <>
         <div className="border border-border rounded-lg mb-4 p-4 space-y-3 bg-surface font-mono text-sm min-h-[200px] max-h-[420px] overflow-y-auto">
           {entries.length === 0 && <p className="text-text-muted">No session yet — launch one below.</p>}
-          {entries.map((entry, i) => (
-            <div key={i} className="whitespace-pre-wrap">
-              {entry.type === 'message' && 'role' in entry ? (
-                <>
-                  <span className="text-accent">{String(entry.role)}: </span>
-                  {String((entry as { text: string }).text)}
-                </>
-              ) : (
-                <span className="text-text-muted">[{entry.type}] {JSON.stringify(entry)}</span>
-              )}
-            </div>
-          ))}
+          {entries.map((entry, i) =>
+            entry.type === 'message' && 'role' in entry ? (
+              <div key={i} className="whitespace-pre-wrap">
+                <span className="text-accent">{String(entry.role)}: </span>
+                {String((entry as { text: string }).text)}
+              </div>
+            ) : entry.type === 'needs_input' ? (
+              <div key={i} className="border border-warning/40 bg-warning/10 rounded-md px-3 py-2 text-warning">
+                <span className="font-medium">Needs input: </span>
+                {String((entry as { question?: string }).question ?? '')}
+              </div>
+            ) : (
+              <div key={i} className="whitespace-pre-wrap text-text-muted">
+                [{entry.type}] {JSON.stringify(entry)}
+              </div>
+            ),
+          )}
         </div>
 
-        <form onSubmit={launch} className="space-y-2">
-          <div className="flex gap-2">
-            <select
-              value={agentId}
-              onChange={(e) => setAgentId(e.target.value)}
-              className="bg-surface border border-border rounded-md px-2 py-2 text-sm outline-none"
+        {session?.status === 'failed' && (
+          <div className="flex items-center gap-2 mb-4 border border-error/40 bg-error/10 rounded-md px-3 py-2">
+            <span className="text-error text-sm flex-1">Session failed{session.exitCode !== null ? ` (exit ${session.exitCode})` : ''}.</span>
+            <button
+              type="button"
+              onClick={restart}
+              disabled={!lastLaunchRef.current}
+              className="text-xs bg-surface-elevated border border-border rounded-md px-2 py-1 hover:border-accent disabled:opacity-40"
             >
-              {Object.entries(agents).map(([id, available]) => (
-                <option key={id} value={id} disabled={!available}>
-                  {id} {available ? '' : '(not detected)'}
-                </option>
-              ))}
-            </select>
+              Restart
+            </button>
+            <button
+              type="button"
+              onClick={deleteWorktree}
+              disabled={deleting}
+              className="text-xs bg-surface-elevated border border-border rounded-md px-2 py-1 hover:border-error disabled:opacity-40"
+            >
+              Delete worktree
+            </button>
           </div>
+        )}
+
+        <form onSubmit={submitComposer} className="space-y-2">
+          {session?.status !== 'needs_input' && (
+            <div className="flex gap-2">
+              <select
+                value={agentId}
+                onChange={(e) => setAgentId(e.target.value)}
+                className="bg-surface border border-border rounded-md px-2 py-2 text-sm outline-none"
+              >
+                {Object.entries(agents).map(([id, available]) => (
+                  <option key={id} value={id} disabled={!available}>
+                    {id} {available ? '' : '(not detected)'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {composerError && <p className="text-error text-xs">{composerError}</p>}
           <textarea
+            ref={composerRef}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe the task..."
+            placeholder={session?.status === 'needs_input' ? 'Answer the agent...' : 'Describe the task...'}
             rows={3}
             disabled={session?.status === 'running' || session?.status === 'starting'}
             className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent disabled:opacity-50"
@@ -194,7 +267,7 @@ export default function WorktreePage() {
             disabled={session?.status === 'running' || session?.status === 'starting'}
             className="bg-accent text-white px-3 py-2 rounded-md text-sm disabled:opacity-50"
           >
-            Launch session
+            {session?.status === 'needs_input' ? 'Reply' : 'Launch session'}
           </button>
         </form>
           </>
