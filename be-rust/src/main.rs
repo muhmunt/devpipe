@@ -1,14 +1,21 @@
+mod db;
 mod domain;
+mod error;
+mod handlers;
 
 use axum::Router;
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new();
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://devpipe:devpipe@localhost:5432/devpipe".to_string());
+    let pool = db::connect(&database_url).await;
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8082")
+    let app = Router::new().nest("/api", handlers::routes()).with_state(pool);
+
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8081")
         .await
-        .expect("failed to bind :8082");
-    println!("devpipe-rust listening on :8082");
+        .expect("failed to bind :8081");
+    println!("devpipe-rust listening on :8081");
     axum::serve(listener, app).await.expect("server error");
 }

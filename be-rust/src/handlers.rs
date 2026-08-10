@@ -1,0 +1,204 @@
+use axum::extract::{Path, State};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use chrono::Utc;
+use serde::Deserialize;
+use sqlx::{PgPool, Row};
+use uuid::Uuid;
+
+use crate::domain::{Repository, Worktree, WorktreeKind, WorktreeStatus, Workspace};
+use crate::error::AppError;
+
+pub fn routes() -> Router<PgPool> {
+    Router::new()
+        .route("/workspaces", get(list_workspaces).post(create_workspace))
+        .route("/workspaces/:id", get(get_workspace))
+        .route("/workspaces/:id/repositories", get(list_repositories))
+        .route("/repositories", post(create_repository))
+        .route("/repositories/:id", get(get_repository))
+        .route("/repositories/:id/worktrees", post(create_worktree))
+        .route("/worktrees/:id", get(get_worktree).delete(delete_worktree))
+}
+
+fn workspace_from_row(row: &sqlx::postgres::PgRow) -> Workspace {
+    Workspace {
+        id: row.get("id"),
+        name: row.get("name"),
+        color: row.get("color"),
+        icon: row.get("icon"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+        last_opened_at: row.get("last_opened_at"),
+    }
+}
+
+fn repository_from_row(row: &sqlx::postgres::PgRow) -> Repository {
+    Repository {
+        id: row.get("id"),
+        workspace_id: row.get("workspace_id"),
+        name: row.get("name"),
+        local_path: row.get("local_path"),
+        remote_url: row.get("remote_url"),
+        default_branch: row.get("default_branch"),
+        setup_script: row.get("setup_script"),
+        run_script: row.get("run_script"),
+        test_script: row.get("test_script"),
+        teardown_script: row.get("teardown_script"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    }
+}
+
+fn worktree_from_row(row: &sqlx::postgres::PgRow) -> Result<Worktree, AppError> {
+    let kind: String = row.get("kind");
+    let status: String = row.get("status");
+    Ok(Worktree {
+        id: row.get("id"),
+        repository_id: row.get("repository_id"),
+        path: row.get("path"),
+        branch: row.get("branch"),
+        target_branch: row.get("target_branch"),
+        kind: WorktreeKind::from_str(&kind)?,
+        status: WorktreeStatus::from_str(&status)?,
+        archived_at: row.get("archived_at"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    })
+}
+
+// --- workspaces ----------------------------------------------------------
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateWorkspaceBody {
+    name: String,
+    color: Option<String>,
+    icon: Option<String>,
+}
+
+async fn list_workspaces(State(pool): State<PgPool>) -> Result<Json<Vec<Workspace>>, AppError> {
+    let rows = sqlx::query("SELECT * FROM workspaces ORDER BY created_at DESC")
+        .fetch_all(&pool)
+        .await?;
+    Ok(Json(rows.iter().map(workspace_from_row).collect()))
+}
+
+async fn create_workspace(
+    State(pool): State<PgPool>,
+    Json(body): Json<CreateWorkspaceBody>,
+) -> Result<Json<Workspace>, AppError> {
+    let id = Uuid::new_v4();
+    let now = Utc::now();
+    let row = sqlx::query(
+        "INSERT INTO workspaces (id, name, color, icon, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $5) RETURNING *",
+    )
+    .bind(id)
+    .bind(&body.name)
+    .bind(&body.color)
+    .bind(&body.icon)
+    .bind(now)
+    .fetch_one(&pool)
+    .await?;
+    Ok(Json(workspace_from_row(&row)))
+}
+
+async fn get_workspace(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Workspace>, AppError> {
+    let row = sqlx::query("SELECT * FROM workspaces WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&pool)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(workspace_from_row(&row)))
+}
+
+// --- repositories ----------------------------------------------------------
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateRepositoryBody {
+    workspace_id: Uuid,
+    name: String,
+    local_path: String,
+    remote_url: Option<String>,
+    default_branch: Option<String>,
+}
+
+async fn list_repositories(
+    State(pool): State<PgPool>,
+    Path(workspace_id): Path<Uuid>,
+) -> Result<Json<Vec<Repository>>, AppError> {
+    let rows = sqlx::query("SELECT * FROM repositories WHERE workspace_id = $1 ORDER BY created_at DESC")
+        .bind(workspace_id)
+        .fetch_all(&pool)
+        .await?;
+    Ok(Json(rows.iter().map(repository_from_row).collect()))
+}
+
+async fn create_repository(
+    State(pool): State<PgPool>,
+    Json(body): Json<CreateRepositoryBody>,
+) -> Result<Json<Repository>, AppError> {
+    let id = Uuid::new_v4();
+    let now = Utc::now();
+    let default_branch = body.default_branch.unwrap_or_else(|| "main".to_string());
+    let row = sqlx::query(
+        "INSERT INTO repositories (id, workspace_id, name, local_path, remote_url, default_branch, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING *",
+    )
+    .bind(id)
+    .bind(body.workspace_id)
+    .bind(&body.name)
+    .bind(&body.local_path)
+    .bind(&body.remote_url)
+    .bind(&default_branch)
+    .bind(now)
+    .fetch_one(&pool)
+    .await?;
+    Ok(Json(repository_from_row(&row)))
+}
+
+async fn get_repository(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Repository>, AppError> {
+    let row = sqlx::query("SELECT * FROM repositories WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&pool)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(repository_from_row(&row)))
+}
+
+// --- worktrees ----------------------------------------------------------
+// Real git operations land in Rung 3 (phase-r2). Until then, create/delete
+// return 501 rather than faking a worktree that doesn't exist on disk.
+
+async fn create_worktree(
+    State(_pool): State<PgPool>,
+    Path(_repository_id): Path<Uuid>,
+) -> Result<Json<Worktree>, AppError> {
+    Err(AppError::NotImplemented)
+}
+
+async fn delete_worktree(
+    State(_pool): State<PgPool>,
+    Path(_id): Path<Uuid>,
+) -> Result<(), AppError> {
+    Err(AppError::NotImplemented)
+}
+
+async fn get_worktree(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Worktree>, AppError> {
+    let row = sqlx::query("SELECT * FROM worktrees WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&pool)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(worktree_from_row(&row)?))
+}

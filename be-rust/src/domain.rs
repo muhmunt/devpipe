@@ -61,6 +61,23 @@ pub enum WorktreeKind {
     Task,
 }
 
+impl WorktreeKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            WorktreeKind::Primary => "primary",
+            WorktreeKind::Task => "task",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "primary" => Ok(WorktreeKind::Primary),
+            "task" => Ok(WorktreeKind::Task),
+            other => Err(DomainError::Invalid(format!("unknown worktree kind: {other}"))),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WorktreeStatus {
@@ -69,6 +86,29 @@ pub enum WorktreeStatus {
     Conflicted,
     Ahead,
     Behind,
+}
+
+impl WorktreeStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            WorktreeStatus::Clean => "clean",
+            WorktreeStatus::Modified => "modified",
+            WorktreeStatus::Conflicted => "conflicted",
+            WorktreeStatus::Ahead => "ahead",
+            WorktreeStatus::Behind => "behind",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "clean" => Ok(WorktreeStatus::Clean),
+            "modified" => Ok(WorktreeStatus::Modified),
+            "conflicted" => Ok(WorktreeStatus::Conflicted),
+            "ahead" => Ok(WorktreeStatus::Ahead),
+            "behind" => Ok(WorktreeStatus::Behind),
+            other => Err(DomainError::Invalid(format!("unknown worktree status: {other}"))),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
