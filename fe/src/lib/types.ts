@@ -108,6 +108,17 @@ export type TimelineEntry =
   | { type: 'message'; role: string; text: string }
   | ({ type: string } & Record<string, unknown>)
 
+export type CommandScope = 'global' | 'workspace' | 'repository'
+
+export type Command = {
+  id: string
+  scope: CommandScope
+  scopeId: string | null
+  name: string
+  prompt: string
+  createdAt: string
+}
+
 export type ScriptOutput = {
   stdout: string
   stderr: string

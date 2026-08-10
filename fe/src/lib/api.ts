@@ -1,6 +1,8 @@
 import type {
   AgentDefinition,
   AgentSession,
+  Command,
+  CommandScope,
   Diff,
   EditorAvailability,
   Repository,
@@ -58,6 +60,15 @@ export const api = {
     request<AgentDefinition>('/agent-definitions', { method: 'POST', body: JSON.stringify(body) }),
   detectAgents: () => request<Record<string, boolean>>('/agents/detect'),
   detectEditors: () => request<EditorAvailability>('/editors/detect'),
+
+  listCommands: (params: { workspaceId?: string; repositoryId?: string }) => {
+    const qs = new URLSearchParams()
+    if (params.workspaceId) qs.set('workspaceId', params.workspaceId)
+    if (params.repositoryId) qs.set('repositoryId', params.repositoryId)
+    return request<Command[]>(`/commands?${qs}`)
+  },
+  createCommand: (body: { scope: CommandScope; scopeId?: string; name: string; prompt: string }) =>
+    request<Command>('/commands', { method: 'POST', body: JSON.stringify(body) }),
 
   createSession: (
     worktreeId: string,

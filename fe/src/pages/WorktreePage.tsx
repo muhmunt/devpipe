@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { StatusDot } from '@/components/StatusDot'
+import { CommandMenu } from '@/components/CommandMenu'
 import { DiffView } from '@/components/DiffView'
 import { FilesPanel } from '@/components/FilesPanel'
 import { GitActionBar } from '@/components/GitActionBar'
@@ -279,22 +280,35 @@ export default function WorktreePage() {
             </div>
           )}
           {composerError && <p className="text-error text-xs">{composerError}</p>}
-          <textarea
-            ref={composerRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              // ⌘Enter / Ctrl+Enter (spec §29) — submit without leaving the textarea.
-              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                e.preventDefault()
-                e.currentTarget.form?.requestSubmit()
-              }
-            }}
-            placeholder={session?.status === 'needs_input' ? 'Answer the agent...' : 'Describe the task...'}
-            rows={3}
-            disabled={session?.status === 'running' || session?.status === 'starting'}
-            className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent disabled:opacity-50"
-          />
+          <div className="relative">
+            {prompt.startsWith('/') && repository && (
+              <CommandMenu
+                query={prompt.slice(1)}
+                workspaceId={repository.workspaceId}
+                repositoryId={repository.id}
+                onSelect={(text) => {
+                  setPrompt(text)
+                  composerRef.current?.focus()
+                }}
+              />
+            )}
+            <textarea
+              ref={composerRef}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                // ⌘Enter / Ctrl+Enter (spec §29) — submit without leaving the textarea.
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault()
+                  e.currentTarget.form?.requestSubmit()
+                }
+              }}
+              placeholder={session?.status === 'needs_input' ? 'Answer the agent...' : 'Describe the task... (try "/")'}
+              rows={3}
+              disabled={session?.status === 'running' || session?.status === 'starting'}
+              className="w-full bg-surface border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent disabled:opacity-50"
+            />
+          </div>
           <button
             type="submit"
             disabled={session?.status === 'running' || session?.status === 'starting'}

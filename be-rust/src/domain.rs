@@ -184,6 +184,25 @@ pub enum CommandScope {
     Repository,
 }
 
+impl CommandScope {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CommandScope::Global => "global",
+            CommandScope::Workspace => "workspace",
+            CommandScope::Repository => "repository",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "global" => Ok(CommandScope::Global),
+            "workspace" => Ok(CommandScope::Workspace),
+            "repository" => Ok(CommandScope::Repository),
+            other => Err(DomainError::Invalid(format!("unknown command scope: {other}"))),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Command {

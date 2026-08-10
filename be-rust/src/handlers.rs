@@ -1,4 +1,4 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::Utc;
@@ -6,7 +6,7 @@ use serde::Deserialize;
 use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
-use crate::domain::{AgentDefinition, Repository, Worktree, WorktreeKind, WorktreeStatus, Workspace};
+use crate::domain::{AgentDefinition, Command, CommandScope, Repository, Worktree, WorktreeKind, WorktreeStatus, Workspace};
 use crate::error::AppError;
 
 pub fn routes() -> Router<crate::state::AppState> {
@@ -26,6 +26,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
         .route("/agents/detect", get(detect_agents))
         .route("/editors/detect", get(detect_editors))
+        .route("/commands", get(list_commands).post(create_command))
 }
 
 fn workspace_from_row(row: &sqlx::postgres::PgRow) -> Workspace {
@@ -432,4 +433,78 @@ async fn detect_agents(State(pool): State<PgPool>) -> Result<Json<std::collectio
 
 async fn detect_editors() -> Json<crate::editors::EditorAvailability> {
     Json(crate::editors::detect_all().await)
+}
+
+// --- custom commands (spec §27) ------------------------------------------
+
+fn command_from_row(row: &sqlx::postgres::PgRow) -> Result<Command, AppError> {
+    let scope: String = row.get("scope");
+    Ok(Command {
+        id: row.get("id"),
+        scope: CommandScope::from_str(&scope)?,
+        scope_id: row.get("scope_id"),
+        name: row.get("name"),
+        prompt: row.get("prompt"),
+        created_at: row.get("created_at"),
+    })
+}
+
+#[derive(Deserialize)]
+struct ListCommandsParams {
+    #[serde(rename = "workspaceId")]
+    workspace_id: Option<Uuid>,
+    #[serde(rename = "repositoryId")]
+    repository_id: Option<Uuid>,
+}
+
+/// Global commands always apply; workspace/repository-scoped ones only
+/// apply when the caller's current context matches — this is the set a
+/// composer's `/` menu should offer.
+async fn list_commands(
+    State(pool): State<PgPool>,
+    Query(params): Query<ListCommandsParams>,
+) -> Result<Json<Vec<Command>>, AppError> {
+    let rows = sqlx::query(
+        "SELECT * FROM commands WHERE scope = 'global'
+            OR (scope = 'workspace' AND scope_id = $1)
+            OR (scope = 'repository' AND scope_id = $2)
+         ORDER BY name",
+    )
+    .bind(params.workspace_id)
+    .bind(params.repository_id)
+    .fetch_all(&pool)
+    .await?;
+    let commands: Result<Vec<Command>, AppError> = rows.iter().map(command_from_row).collect();
+    Ok(Json(commands?))
+}
+
+#[derive(Deserialize)]
+struct CreateCommandBody {
+    scope: String,
+    #[serde(rename = "scopeId")]
+    scope_id: Option<Uuid>,
+    name: String,
+    prompt: String,
+}
+
+async fn create_command(
+    State(pool): State<PgPool>,
+    Json(body): Json<CreateCommandBody>,
+) -> Result<Json<Command>, AppError> {
+    let scope = CommandScope::from_str(&body.scope)?;
+    if scope != CommandScope::Global && body.scope_id.is_none() {
+        return Err(AppError::Invalid("scopeId is required for workspace/repository-scoped commands".into()));
+    }
+    let id = Uuid::new_v4();
+    let row = sqlx::query(
+        "INSERT INTO commands (id, scope, scope_id, name, prompt, created_at) VALUES ($1, $2, $3, $4, $5, now()) RETURNING *",
+    )
+    .bind(id)
+    .bind(scope.as_str())
+    .bind(body.scope_id)
+    .bind(&body.name)
+    .bind(&body.prompt)
+    .fetch_one(&pool)
+    .await?;
+    Ok(Json(command_from_row(&row)?))
 }
