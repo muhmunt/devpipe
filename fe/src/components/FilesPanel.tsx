@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, File, Folder } from 'lucide-react'
 import { SkeletonRows } from '@/components/Skeleton'
@@ -26,19 +27,21 @@ function buildTree(paths: string[]): TreeNode {
   return root
 }
 
-function TreeView({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
+function TreeView({ node, depth = 0, onOpenFile }: { node: TreeNode; depth?: number; onOpenFile: (path: string) => void }) {
   const [open, setOpen] = useState(depth < 1)
   const isDir = !!node.children
 
   if (!isDir) {
     return (
-      <div
-        className="flex items-center gap-1.5 h-6 text-[12px] text-text-muted hover:bg-surface-hover transition-colors"
+      <button
+        type="button"
+        onClick={() => onOpenFile(node.path)}
+        className="flex items-center gap-1.5 h-6 text-[12px] w-full text-left text-text-muted hover:bg-surface-hover hover:text-text focus-visible:bg-surface-hover active:translate-y-px transition-colors"
         style={{ paddingLeft: depth * 12 + 10 }}
       >
         <File size={11} className="shrink-0 text-text-faint" />
         <span className="truncate">{node.name}</span>
-      </div>
+      </button>
     )
   }
 
@@ -53,7 +56,7 @@ function TreeView({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-1 h-6 text-[12px] w-full text-left hover:bg-surface-hover transition-colors"
+          className="flex items-center gap-1 h-6 text-[12px] w-full text-left hover:bg-surface-hover focus-visible:bg-surface-hover active:translate-y-px transition-colors"
           style={{ paddingLeft: (depth - 1) * 12 + 10 }}
         >
           {open ? <ChevronDown size={11} className="shrink-0 text-text-faint" /> : <ChevronRight size={11} className="shrink-0 text-text-faint" />}
@@ -61,14 +64,15 @@ function TreeView({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
           <span className="truncate">{node.name}</span>
         </button>
       )}
-      {(open || depth === 0) && children.map((child) => <TreeView key={child.path} node={child} depth={depth + 1} />)}
+      {(open || depth === 0) &&
+        children.map((child) => <TreeView key={child.path} node={child} depth={depth + 1} onOpenFile={onOpenFile} />)}
     </div>
   )
 }
 
 // spec §86 Files tab — real worktree contents (tracked + untracked-not-
 // ignored, via Rung 7's git ls-files-backed endpoint), not a fake tree.
-export function FilesPanel({ worktreeId }: { worktreeId: string }) {
+export function FilesPanel({ worktreeId, onOpenFile }: { worktreeId: string; onOpenFile: (path: string) => void }) {
   const [paths, setPaths] = useState<string[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -88,7 +92,7 @@ export function FilesPanel({ worktreeId }: { worktreeId: string }) {
 
   return (
     <div className="py-1">
-      <TreeView node={tree} />
+      <TreeView node={tree} onOpenFile={onOpenFile} />
     </div>
   )
 }

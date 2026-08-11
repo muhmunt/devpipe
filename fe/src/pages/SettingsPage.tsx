@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useState } from 'react'
 import { AppShell } from '@/components/AppShell'
 import { SkeletonRows } from '@/components/Skeleton'

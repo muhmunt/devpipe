@@ -1,30 +1,42 @@
+/* devpipe · design-system: design.md */
+import { Check, CircleDashed, CircleDot, Loader2, Minus, TriangleAlert, X } from 'lucide-react'
 import type { SessionStatus } from '@/lib/types'
 
-// Glyph + color per spec §20. `thinking` is a UI-only extension (no backend
-// enum value yet) reserved for a future streaming-in-progress indicator.
+// Agent-session status. `thinking` is a UI-only extension reserved for a
+// streaming indicator; it has no backend enum value.
 type Status = SessionStatus | 'thinking' | 'idle'
 
-const META: Record<Status, { glyph: string; className: string; label: string; pulse?: boolean }> = {
-  created: { glyph: '○', className: 'text-text-muted', label: 'created' },
-  starting: { glyph: '●', className: 'text-accent', label: 'starting', pulse: true },
-  running: { glyph: '●', className: 'text-accent', label: 'running', pulse: true },
-  thinking: { glyph: '◐', className: 'text-accent', label: 'thinking', pulse: true },
-  needs_input: { glyph: '!', className: 'text-warning', label: 'needs input' },
-  waiting: { glyph: '◐', className: 'text-text-muted', label: 'waiting' },
-  completed: { glyph: '✓', className: 'text-success', label: 'completed' },
-  failed: { glyph: '×', className: 'text-error', label: 'failed' },
-  stopped: { glyph: '○', className: 'text-text-muted', label: 'stopped' },
-  idle: { glyph: '○', className: 'text-text-muted', label: 'idle' },
+// Icons rather than hand-typed glyphs (design.md §8): lucide is already the
+// project's icon family, and drawn symbols don't inherit its stroke weight or
+// optical sizing.
+const META: Record<Status, { icon: typeof Check; className: string; label: string; spin?: boolean }> = {
+  created: { icon: CircleDashed, className: 'text-text-faint', label: 'created' },
+  starting: { icon: Loader2, className: 'text-accent', label: 'starting', spin: true },
+  running: { icon: Loader2, className: 'text-accent', label: 'running', spin: true },
+  thinking: { icon: Loader2, className: 'text-accent', label: 'thinking', spin: true },
+  needs_input: { icon: TriangleAlert, className: 'text-warning', label: 'needs input' },
+  waiting: { icon: CircleDot, className: 'text-text-muted', label: 'waiting' },
+  completed: { icon: Check, className: 'text-success', label: 'completed' },
+  failed: { icon: X, className: 'text-error', label: 'failed' },
+  stopped: { icon: Minus, className: 'text-text-faint', label: 'stopped' },
+  idle: { icon: CircleDashed, className: 'text-text-faint', label: 'idle' },
 }
 
 export function StatusDot({ status, showLabel = false }: { status: Status; showLabel?: boolean }) {
   const meta = META[status] ?? META.idle
+  const Icon = meta.icon
   return (
-    <span className="inline-flex items-center gap-1.5 font-mono text-xs">
-      <span className={`${meta.className} ${meta.pulse ? 'animate-pulse' : ''}`} aria-hidden>
-        {meta.glyph}
-      </span>
-      {showLabel && <span className="text-text-muted">{meta.label}</span>}
+    <span className="inline-flex items-center gap-1.5">
+      <Icon
+        size={12}
+        className={`shrink-0 ${meta.className} ${meta.spin ? 'animate-spin' : ''}`}
+        aria-hidden
+      />
+      {showLabel ? (
+        <span className="text-text-muted text-[12px]">{meta.label}</span>
+      ) : (
+        <span className="sr-only">{meta.label}</span>
+      )}
     </span>
   )
 }

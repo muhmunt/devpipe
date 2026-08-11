@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useMemo } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'

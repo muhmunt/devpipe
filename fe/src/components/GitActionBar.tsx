@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import type { Worktree } from '@/lib/types'

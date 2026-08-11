@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -131,6 +132,33 @@ export function Sidebar() {
   }
   useEffect(loadWorkspaces, [])
 
+  // Land on a worktree route (direct link, refresh, or navigating from
+  // elsewhere) and its workspace/project chain expands to reveal it,
+  // instead of always starting fully collapsed.
+  useEffect(() => {
+    const match = location.pathname.match(/^\/worktrees\/([^/]+)/)
+    if (!match) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const wt = await api.getWorktree(match[1])
+        const repo = await api.getRepository(wt.repositoryId)
+        if (cancelled) return
+        setOpenWorkspaces((prev) => new Set(prev).add(repo.workspaceId))
+        setOpenRepos((prev) => new Set(prev).add(repo.id))
+        const repos = await api.listRepositories(repo.workspaceId)
+        if (cancelled) return
+        setReposByWs((prev) => ({ ...prev, [repo.workspaceId]: repos }))
+        await loadWorktrees(repo.id)
+      } catch {
+        // Route points at a worktree that's gone — nothing to expand.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [location.pathname])
+
   async function loadWorktrees(repoId: string) {
     setWorktreesByRepo((prev) => ({ ...prev, [repoId]: prev[repoId] ?? [] }))
     const wts = await api.listWorktrees(repoId)
@@ -224,7 +252,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => setShowNewProject(true)}
-          className="text-text-faint hover:text-text transition-colors"
+          className="text-text-faint hover:text-text active:translate-y-px transition-colors"
           aria-label="New project"
         >
           <Plus size={13} />
@@ -241,7 +269,7 @@ export function Sidebar() {
                   type="button"
                   onClick={() => toggleWorkspace(ws.id)}
                   aria-expanded={wsOpen}
-                  className="flex items-center gap-1.5 min-w-0 flex-1 text-left"
+                  className="flex items-center gap-1.5 min-w-0 flex-1 text-left active:translate-y-px transition-transform"
                 >
                   {wsOpen ? (
                     <ChevronDown size={12} className="text-text-faint shrink-0" />
@@ -274,7 +302,7 @@ export function Sidebar() {
                           type="button"
                           onClick={() => toggleRepo(repo.id)}
                           aria-expanded={repoOpen}
-                          className="flex items-center gap-1.5 min-w-0 flex-1 text-left text-text-muted"
+                          className="flex items-center gap-1.5 min-w-0 flex-1 text-left text-text-muted active:translate-y-px transition-transform"
                         >
                           {repoOpen ? <ChevronDown size={11} className="shrink-0" /> : <ChevronRight size={11} className="shrink-0" />}
                           <span className="truncate text-[12px]">{repo.name}</span>
@@ -286,7 +314,7 @@ export function Sidebar() {
                             setCreatingIn(creatingIn === repo.id ? null : repo.id)
                           }}
                           aria-label={`New worktree in ${repo.name}`}
-                          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-0.5 rounded text-text-faint hover:text-text transition-colors"
+                          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-0.5 rounded text-text-faint hover:text-text active:translate-y-px transition-colors"
                         >
                           <Plus size={12} />
                         </button>
@@ -322,7 +350,7 @@ export function Sidebar() {
                           return (
                             <div
                               key={wt.id}
-                              className={`group flex items-start gap-2 pl-5 pr-1.5 py-1.5 rounded-md transition-colors ${
+                              className={`group flex items-start gap-2 pl-5 pr-1.5 py-1.5 rounded-md transition-colors focus-within:bg-surface-hover ${
                                 active ? 'bg-accent-soft' : 'hover:bg-surface-hover'
                               }`}
                             >
@@ -402,7 +430,7 @@ export function Sidebar() {
       <div className="shrink-0 border-t border-border px-2 h-9 flex items-center gap-1">
         <Link
           to="/settings"
-          className="p-1 rounded-md text-text-faint hover:text-text hover:bg-surface-hover transition-colors"
+          className="p-1 rounded-md text-text-faint hover:text-text hover:bg-surface-hover active:translate-y-px transition-colors"
           aria-label="Settings"
         >
           <Settings size={14} />
@@ -410,7 +438,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => setShowNewProject(true)}
-          className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded-md text-text-muted hover:text-text hover:bg-surface-hover transition-colors text-left"
+          className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded-md text-text-muted hover:text-text hover:bg-surface-hover active:translate-y-px transition-colors text-left"
         >
           <Plus size={13} /> New project
         </button>

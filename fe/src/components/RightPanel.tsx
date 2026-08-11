@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useState } from 'react'
 import { GitCommitHorizontal } from 'lucide-react'
 import { DiffView } from '@/components/DiffView'
@@ -45,10 +46,12 @@ export function RightPanel({
   worktreeId,
   repository,
   onRepositoryChange,
+  onOpenFile,
 }: {
   worktreeId: string
   repository: Repository | null
   onRepositoryChange: (r: Repository) => void
+  onOpenFile: (path: string) => void
 }) {
   const [tab, setTab] = useState<PanelTab>('files')
   const [changeCount, setChangeCount] = useState<number | null>(null)
@@ -80,7 +83,7 @@ export function RightPanel({
               role="tab"
               aria-selected={active}
               onClick={() => setTab(t.key)}
-              className={`px-2 py-0.5 rounded-md text-[12px] transition-colors ${
+              className={`px-2 py-0.5 rounded-md text-[12px] active:translate-y-px transition-colors ${
                 active ? 'bg-surface-hover text-text' : 'text-text-muted hover:text-text'
               }`}
             >
@@ -92,7 +95,7 @@ export function RightPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {tab === 'files' && <FilesPanel worktreeId={worktreeId} />}
+        {tab === 'files' && <FilesPanel worktreeId={worktreeId} onOpenFile={onOpenFile} />}
         {tab === 'changes' && <DiffView worktreeId={worktreeId} />}
         {tab === 'commits' && <CommitsList worktreeId={worktreeId} />}
         {tab === 'scripts' &&

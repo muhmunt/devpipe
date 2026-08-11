@@ -1,13 +1,15 @@
+/* devpipe · design-system: design.md */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { Composer } from '@/components/Composer'
 import { FilesPanel } from '@/components/FilesPanel'
-import { Markdown } from '@/components/Markdown'
+import { FileView } from '@/components/FileView'
 import { RightPanel } from '@/components/RightPanel'
 import { SessionTabs, type MainView } from '@/components/SessionTabs'
 import { SkeletonRows } from '@/components/Skeleton'
 import { StatusBar } from '@/components/StatusBar'
+import { Transcript } from '@/components/Transcript'
 import { api } from '@/lib/api'
 import { addTab } from '@/lib/tabs'
 import type { AgentEvent, AgentSession, Repository, TimelineEntry, Worktree } from '@/lib/types'
@@ -34,6 +36,8 @@ export default function WorktreePage() {
   const [repository, setRepository] = useState<Repository | null>(null)
   const [sessions, setSessions] = useState<AgentSession[]>([])
   const [view, setView] = useState<MainView>({ kind: 'new' })
+  const [openFiles, setOpenFiles] = useState<string[]>([])
+  const [closedSessionIds, setClosedSessionIds] = useState<Set<string>>(new Set())
   const [session, setSession] = useState<AgentSession | null>(null)
   const [entries, setEntries] = useState<TimelineEntry[]>([])
   const [loadingTimeline, setLoadingTimeline] = useState(false)
@@ -51,17 +55,27 @@ export default function WorktreePage() {
       const next = [...prev]
       for (const ev of events) {
         if (ev.type === 'message_delta') {
+          // Deltas are exact substrings of the final text (Claude streams
+          // token-by-token, embedded newlines and all) — concatenate
+          // directly, don't inject a separator between chunks.
           const last = next[next.length - 1]
           if (last?.type === 'message' && 'role' in last && last.role === ev.role) {
-            next[next.length - 1] = { ...last, text: `${last.text}\n${ev.text}` }
+            next[next.length - 1] = { ...last, text: `${last.text}${ev.text}` }
             continue
           }
           next.push({ type: 'message', role: ev.role, text: ev.text })
+        } else if (ev.type === 'session_idle') {
+          // Readiness signal only — the chat stays open for another turn,
+          // nothing for the transcript to show.
         } else {
           next.push({ ...ev } as TimelineEntry)
         }
         if (ev.type === 'session_completed' || ev.type === 'session_error') {
           setSession((s) => (s ? { ...s, status: ev.type === 'session_completed' ? 'completed' : 'failed' } : s))
+        }
+        if (ev.type === 'session_idle') {
+          setSession((s) => (s ? { ...s, status: 'waiting' } : s))
+          setTimeout(() => composerRef.current?.focus(), 0)
         }
         if (ev.type === 'needs_input') {
           setSession((s) => (s ? { ...s, status: 'needs_input' } : s))
@@ -95,6 +109,8 @@ export default function WorktreePage() {
     setSession(null)
     setEntries([])
     setView({ kind: 'new' })
+    setOpenFiles([])
+    setClosedSessionIds(new Set())
 
     api
       .getWorktree(id)
@@ -148,7 +164,11 @@ export default function WorktreePage() {
     if (!prompt.trim() || !id) return
     setComposerError(null)
     try {
-      if (session?.status === 'needs_input' && view.kind === 'session') {
+      // A session that's mid-conversation (waiting for the next turn, or
+      // blocked on a question) keeps replying in the same tab instead of
+      // spinning up a new chat.
+      const continuing = view.kind === 'session' && (session?.status === 'needs_input' || session?.status === 'waiting')
+      if (continuing && session) {
         const text = prompt.trim()
         setPrompt('')
         await api.reply(session.id, text)
@@ -167,6 +187,41 @@ export default function WorktreePage() {
     } catch (err) {
       setComposerError(String((err as Error).message ?? err))
     }
+  }
+
+  // The tab strip isn't chat-only — a file clicked from either FilesPanel
+  // mount opens here too. Re-clicking an already-open file just switches to
+  // its existing tab instead of duplicating it.
+  function openFile(path: string) {
+    setOpenFiles((prev) => (prev.includes(path) ? prev : [...prev, path]))
+    setView({ kind: 'file', path })
+  }
+
+  function closeFile(path: string) {
+    setOpenFiles((prev) => prev.filter((p) => p !== path))
+    setView((v) => (v.kind === 'file' && v.path === path ? { kind: 'new' } : v))
+  }
+
+  // Closing a chat tab doesn't delete the session (there's no such
+  // endpoint, nor should there be) — it drops out of the open-tabs row into
+  // the History menu, reopenable from there. Closing the active tab falls
+  // back to another still-open session, or 'new' if none are left.
+  function closeSession(sessionId: string) {
+    setClosedSessionIds((prev) => new Set(prev).add(sessionId))
+    setView((v) => {
+      if (!(v.kind === 'session' && v.id === sessionId)) return v
+      const next = sessions.find((s) => s.id !== sessionId && !closedSessionIds.has(s.id))
+      return next ? { kind: 'session', id: next.id } : { kind: 'new' }
+    })
+  }
+
+  function reopenSession(sessionId: string) {
+    setClosedSessionIds((prev) => {
+      const next = new Set(prev)
+      next.delete(sessionId)
+      return next
+    })
+    setView({ kind: 'session', id: sessionId })
   }
 
   if (loadError) {
@@ -188,23 +243,45 @@ export default function WorktreePage() {
 
   return (
     <AppShell
-      rightPanel={<RightPanel worktreeId={worktree.id} repository={repository} onRepositoryChange={setRepository} />}
+      rightPanel={
+        <RightPanel worktreeId={worktree.id} repository={repository} onRepositoryChange={setRepository} onOpenFile={openFile} />
+      }
       statusBar={<StatusBar worktree={worktree} onChange={setWorktree} />}
     >
-      <div className="h-full flex flex-col min-h-0">
-        <div className="shrink-0">
-          <SessionTabs sessions={sessions} view={view} onSelect={setView} />
+      <div className="h-full flex flex-col min-h-0 min-w-0">
+        {/* min-w-0: this is a flex-col item with no overflow of its own —
+            without it, SessionTabs' natural content width (many session +
+            file tabs) forces this wrapper wider instead of letting
+            SessionTabs' own overflow-x-auto scroll the tab row in place. */}
+        <div className="shrink-0 min-w-0">
+          <SessionTabs
+            sessions={sessions}
+            closedSessionIds={closedSessionIds}
+            view={view}
+            onSelect={setView}
+            agents={agents}
+            agentId={agentId}
+            onAgentChange={setAgentId}
+            openFiles={openFiles}
+            onCloseFile={closeFile}
+            onCloseSession={closeSession}
+            onReopenSession={reopenSession}
+          />
         </div>
 
         {view.kind === 'files' ? (
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
             <div className="mx-auto w-full max-w-[760px] px-6 py-4">
-              <FilesPanel worktreeId={worktree.id} />
+              <FilesPanel worktreeId={worktree.id} onOpenFile={openFile} />
             </div>
+          </div>
+        ) : view.kind === 'file' ? (
+          <div className="flex-1 min-h-0 min-w-0">
+            <FileView worktreeId={worktree.id} path={view.path} />
           </div>
         ) : (
           <>
-            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
+            <div ref={scrollRef} className="flex-1 min-h-0 min-w-0 overflow-y-auto">
               <div className="mx-auto w-full max-w-[760px] px-6 py-6 space-y-5">
                 {loadingTimeline && <SkeletonRows rows={5} />}
 
@@ -214,53 +291,9 @@ export default function WorktreePage() {
                   </p>
                 )}
 
-                {entries.map((entry, i) => {
-                  if (entry.type === 'message' && 'role' in entry) {
-                    const role = String(entry.role)
-                    const text = String((entry as { text: string }).text)
-                    if (role === 'user') {
-                      return (
-                        <div key={i} className="flex justify-end">
-                          <div className="max-w-[85%] rounded-xl bg-surface-elevated px-3.5 py-2 whitespace-pre-wrap">{text}</div>
-                        </div>
-                      )
-                    }
-                    return (
-                      <div key={i}>
-                        <p className="text-[11px] text-text-faint mb-1.5">{session?.agentDefinitionId ?? role}</p>
-                        <Markdown text={text} />
-                      </div>
-                    )
-                  }
-
-                  if (entry.type === 'needs_input') {
-                    return (
-                      <div key={i} className="border border-warning/40 bg-warning/10 rounded-lg px-3 py-2 text-warning">
-                        <span className="font-medium">Needs input: </span>
-                        {String((entry as { question?: string }).question ?? '')}
-                      </div>
-                    )
-                  }
-
-                  if (entry.type === 'tool_output' || entry.type === 'tool_started') {
-                    const toolLabel = String((entry as { tool?: string }).tool ?? entry.type)
-                    const output = String((entry as { output?: string }).output ?? '')
-                    return (
-                      <div key={i} className="border border-border rounded-lg overflow-hidden">
-                        <p className="px-3 py-1 bg-surface-elevated text-[11px] font-mono text-text-muted">{toolLabel}</p>
-                        {output && (
-                          <pre className="px-3 py-2 text-[11px] font-mono whitespace-pre-wrap text-text-muted">{output}</pre>
-                        )}
-                      </div>
-                    )
-                  }
-
-                  return (
-                    <p key={i} className="text-[11px] font-mono text-text-faint">
-                      {entry.type}
-                    </p>
-                  )
-                })}
+                {!loadingTimeline && entries.length > 0 && (
+                  <Transcript entries={entries} agentLabel={(session?.agentDefinitionId ?? agentId).toUpperCase()} />
+                )}
               </div>
             </div>
 
@@ -276,7 +309,8 @@ export default function WorktreePage() {
                   onAgentChange={setAgentId}
                   repository={repository}
                   busy={composerBusy}
-                  replying={view.kind === 'session' && session?.status === 'needs_input'}
+                  replying={view.kind === 'session' && (session?.status === 'needs_input' || session?.status === 'waiting')}
+                  showAgentSelect={view.kind !== 'new'}
                   error={composerError}
                 />
               </div>

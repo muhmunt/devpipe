@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { GitBranch, X } from 'lucide-react'

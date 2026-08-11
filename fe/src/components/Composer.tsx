@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { type RefObject } from 'react'
 import { ArrowUp, Loader2 } from 'lucide-react'
 import { CommandMenu } from '@/components/CommandMenu'
@@ -17,6 +18,7 @@ export function Composer({
   repository,
   busy,
   replying,
+  showAgentSelect = true,
   error,
 }: {
   value: string
@@ -29,6 +31,9 @@ export function Composer({
   repository: Repository | null
   busy: boolean
   replying: boolean
+  // The New chat tab already carries its own agent picker — the composer's
+  // copy would just be a second control setting the same value.
+  showAgentSelect?: boolean
   error: string | null
 }) {
   const canSend = Boolean(value.trim()) && !busy
@@ -71,7 +76,7 @@ export function Composer({
         />
 
         <div className="flex items-center gap-2 px-2 pb-2">
-          {!replying && (
+          {!replying && showAgentSelect && (
             <select
               value={agentId}
               onChange={(e) => onAgentChange(e.target.value)}

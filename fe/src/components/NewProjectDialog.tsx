@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useState } from 'react'
 import { FolderOpen, GitBranch, Loader2, Sparkles } from 'lucide-react'
 import { FolderPicker } from '@/components/FolderPicker'

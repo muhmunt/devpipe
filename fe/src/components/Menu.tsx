@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export type MenuItem = {
@@ -38,7 +39,7 @@ export function Menu({ trigger, items, label }: { trigger: ReactNode; items: Men
           e.stopPropagation()
           setOpen((o) => !o)
         }}
-        className="p-0.5 rounded text-text-faint hover:text-text hover:bg-surface-hover transition-colors"
+        className="p-0.5 rounded text-text-faint hover:text-text hover:bg-surface-hover active:translate-y-px transition-colors"
       >
         {trigger}
       </button>
@@ -58,7 +59,7 @@ export function Menu({ trigger, items, label }: { trigger: ReactNode; items: Men
                 setOpen(false)
                 item.onSelect()
               }}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-hover transition-colors ${
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-hover focus-visible:bg-surface-hover active:translate-y-px transition-colors ${
                 item.danger ? 'text-error' : 'text-text'
               }`}
             >

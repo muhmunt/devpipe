@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useState } from 'react'
 import { ChevronRight, CornerLeftUp, Folder, GitBranch, Home, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'

@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 // Loading placeholders shaped like the content they replace, not spinners.
 export function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`skeleton ${className}`} aria-hidden />

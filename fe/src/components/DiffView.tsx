@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useState } from 'react'
 import { SkeletonRows } from '@/components/Skeleton'
 import { api } from '@/lib/api'
@@ -27,7 +28,7 @@ function FileRow({ file }: { file: DiffFile }) {
   const { letter, className } = statusLetter(file.status)
   const { name, dir } = splitPath(file.path)
   return (
-    <li className="flex items-center gap-2 px-3 py-1 hover:bg-surface-hover transition-colors" title={file.path}>
+    <li className="flex items-center gap-2 px-3 py-1 hover:bg-surface-hover focus-within:bg-surface-hover transition-colors" title={file.path}>
       <span className={`font-mono text-[11px] w-3 shrink-0 ${className}`} aria-label={file.status}>
         {letter}
       </span>

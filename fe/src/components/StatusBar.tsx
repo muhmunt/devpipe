@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useState } from 'react'
 import { ArrowRight, GitBranch } from 'lucide-react'
 import { GitActionBar } from '@/components/GitActionBar'
@@ -45,7 +46,7 @@ export function StatusBar({ worktree, onChange }: { worktree: Worktree; onChange
               id="base-branch"
               value={base}
               onChange={(e) => setBase(e.target.value)}
-              className="bg-transparent font-mono text-text-muted hover:text-text outline-none cursor-pointer max-w-[160px]"
+              className="bg-transparent font-mono text-text-muted hover:text-text outline-none cursor-pointer max-w-[160px] min-w-0 truncate"
               title="Branch this worktree is compared against"
             >
               {(branches.length ? branches : [base]).map((b) => (

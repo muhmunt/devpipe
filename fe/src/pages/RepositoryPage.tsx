@@ -1,3 +1,4 @@
+/* devpipe · design-system: design.md */
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { GitBranch, Settings2, Star } from 'lucide-react'
