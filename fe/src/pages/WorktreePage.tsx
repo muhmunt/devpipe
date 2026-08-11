@@ -1,5 +1,6 @@
 /* devpipe · design-system: design.md */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { Composer } from '@/components/Composer'
@@ -30,6 +31,10 @@ const SSE_EVENT_NAMES = [
 
 const RUNNING = new Set(['starting', 'running'])
 
+// Only these belong in the conversation. Lifecycle events are status, not
+// content — see applyEvents.
+const VISIBLE_IN_TRANSCRIPT = new Set(['needs_input', 'tool_started', 'tool_output'])
+
 export default function WorktreePage() {
   const { id } = useParams<{ id: string }>()
   const [worktree, setWorktree] = useState<Worktree | null>(null)
@@ -49,6 +54,7 @@ export default function WorktreePage() {
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const esRef = useRef<EventSource | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const atBottomRef = useRef(true)
 
   const applyEvents = useCallback((events: AgentEvent[]) => {
     setEntries((prev) => {
@@ -64,12 +70,13 @@ export default function WorktreePage() {
             continue
           }
           next.push({ type: 'message', role: ev.role, text: ev.text })
-        } else if (ev.type === 'session_idle') {
-          // Readiness signal only — the chat stays open for another turn,
-          // nothing for the transcript to show.
-        } else {
+        } else if (VISIBLE_IN_TRANSCRIPT.has(ev.type)) {
           next.push({ ...ev } as TimelineEntry)
         }
+        // Everything else (session_started/idle/completed/error,
+        // usage_updated, file_changed) is lifecycle signalling. It drives
+        // status below; rendering it would put bare event names in the
+        // middle of the conversation.
         if (ev.type === 'session_completed' || ev.type === 'session_error') {
           setSession((s) => (s ? { ...s, status: ev.type === 'session_completed' ? 'completed' : 'failed' } : s))
         }
@@ -133,30 +140,55 @@ export default function WorktreePage() {
     return () => esRef.current?.close()
   }, [id])
 
-  // Switching to an existing session replays its transcript, and reattaches
-  // the live stream when that session is still running.
+  // One session, one connection, one source of truth.
+  //
+  // The events endpoint replays everything already persisted for a session
+  // and then tails it live, so the stream alone can render the whole
+  // transcript. The previous version also fetched the timeline in parallel
+  // and opened a second EventSource, which raced: the timeline response
+  // landed after live deltas and overwrote them, and the second connection
+  // closed the first, dropping whatever arrived in between. That is why
+  // messages went missing mid-chat.
+  //
+  // Keyed on the session id alone. Keying on the whole `sessions` array
+  // meant starting any new chat wiped and refetched the chat you were
+  // reading.
+  const activeSessionId = view.kind === 'session' ? view.id : null
+
   useEffect(() => {
-    if (view.kind !== 'session') {
+    if (!activeSessionId) {
       esRef.current?.close()
+      esRef.current = null
+      setEntries([])
+      setLoadingTimeline(false)
       return
     }
-    const target = sessions.find((s) => s.id === view.id)
-    if (!target) return
-    setSession(target)
     setEntries([])
     setLoadingTimeline(true)
-    api
-      .getTimeline(view.id)
-      .then((t) => setEntries(t))
-      .catch(() => setEntries([]))
-      .finally(() => setLoadingTimeline(false))
+    connectStream(activeSessionId)
+    // Replay arrives immediately after connect; the skeleton is only for
+    // that first frame, so clear it once the connection is established
+    // rather than waiting on a request that no longer exists.
+    const t = setTimeout(() => setLoadingTimeline(false), 150)
+    return () => clearTimeout(t)
+  }, [activeSessionId, connectStream])
 
-    if (RUNNING.has(target.status)) connectStream(target.id)
-    else esRef.current?.close()
-  }, [view, sessions, connectStream])
-
+  // Keep the session record (status, agent) in sync without touching the
+  // transcript — status changes must never re-run the stream effect.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+    if (!activeSessionId) {
+      setSession(null)
+      return
+    }
+    setSession((prev) => (prev?.id === activeSessionId ? prev : sessions.find((s) => s.id === activeSessionId) ?? null))
+  }, [activeSessionId, sessions])
+
+  // Follow the tail only when the reader is already at the bottom. Yanking
+  // someone back down while they scroll up to re-read is the single most
+  // irritating thing a chat can do.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el && atBottomRef.current) el.scrollTo({ top: el.scrollHeight })
   }, [entries])
 
   async function submitComposer(e: React.FormEvent) {
@@ -180,10 +212,11 @@ export default function WorktreePage() {
       const created = await api.createSession(id, { agentDefinitionId: agentId, prompt: prompt.trim() })
       setPrompt('')
       setSessions((prev) => [created, ...prev])
-      setEntries([])
       setSession(created)
+      // Switching the view is enough: the stream effect connects, and the
+      // replay carries the prompt back. Connecting here as well is what
+      // produced the duplicate-connection race.
       setView({ kind: 'session', id: created.id })
-      connectStream(created.id)
     } catch (err) {
       setComposerError(String((err as Error).message ?? err))
     }
@@ -240,6 +273,10 @@ export default function WorktreePage() {
   if (!worktree) return null
 
   const composerBusy = view.kind === 'session' && session ? RUNNING.has(session.status) : false
+  const lastEntry = entries[entries.length - 1]
+  const agentIsStreaming =
+    lastEntry?.type === 'message' && 'role' in lastEntry && (lastEntry as { role: string }).role === 'agent'
+  const awaitingReply = composerBusy && !agentIsStreaming
 
   return (
     <AppShell
@@ -260,7 +297,6 @@ export default function WorktreePage() {
             view={view}
             onSelect={setView}
             agents={agents}
-            agentId={agentId}
             onAgentChange={setAgentId}
             openFiles={openFiles}
             onCloseFile={closeFile}
@@ -281,7 +317,14 @@ export default function WorktreePage() {
           </div>
         ) : (
           <>
-            <div ref={scrollRef} className="flex-1 min-h-0 min-w-0 overflow-y-auto">
+            <div
+              ref={scrollRef}
+              onScroll={(e) => {
+                const el = e.currentTarget
+                atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+              }}
+              className="flex-1 min-h-0 min-w-0 overflow-y-auto"
+            >
               <div className="mx-auto w-full max-w-[760px] px-6 py-6 space-y-5">
                 {loadingTimeline && <SkeletonRows rows={5} />}
 
@@ -293,6 +336,17 @@ export default function WorktreePage() {
 
                 {!loadingTimeline && entries.length > 0 && (
                   <Transcript entries={entries} agentLabel={(session?.agentDefinitionId ?? agentId).toUpperCase()} />
+                )}
+
+                {/* The agent is silent for several seconds before its first
+                    token. Without this the app looks like it swallowed the
+                    message. Hidden once text starts arriving, because the
+                    text itself is then the feedback. */}
+                {awaitingReply && (
+                  <div className="flex items-center gap-2 text-text-faint">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span className="text-[12px]">{(session?.agentDefinitionId ?? agentId)} is working</span>
+                  </div>
                 )}
               </div>
             </div>

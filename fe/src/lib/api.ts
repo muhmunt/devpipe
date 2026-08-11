@@ -25,8 +25,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(body.error ?? `request failed: ${res.status}`)
   }
-  if (res.status === 204) return undefined as T
-  return res.json() as Promise<T>
+  // Some handlers (reply, deletes — anything returning Rust's `()`) send 200
+  // with an empty body rather than 204. res.json() on an empty string throws
+  // "Unexpected end of JSON input", so check the body text first instead of
+  // trusting the status code to predict emptiness.
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
 }
 
 export const api = {
@@ -83,6 +87,8 @@ export const api = {
     request<Worktree>(`/worktrees/${id}/commit`, { method: 'POST', body: JSON.stringify({ message }) }),
   pushWorktree: (id: string) => request<Worktree>(`/worktrees/${id}/push`, { method: 'POST' }),
   listFiles: (id: string) => request<string[]>(`/worktrees/${id}/files`),
+  readFile: (id: string, path: string) =>
+    request<{ path: string; content: string }>(`/worktrees/${id}/files/content?path=${encodeURIComponent(path)}`),
   runScript: (worktreeId: string, script: 'setup' | 'run' | 'test' | 'teardown') =>
     request<ScriptOutput>(`/worktrees/${worktreeId}/run-script`, { method: 'POST', body: JSON.stringify({ script }) }),
 

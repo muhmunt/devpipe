@@ -25,6 +25,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/worktrees/:id/commit", post(commit_worktree))
         .route("/worktrees/:id/push", post(push_worktree))
         .route("/worktrees/:id/files", get(list_files))
+        .route("/worktrees/:id/files/content", get(read_worktree_file))
         .route("/worktrees/:id/commits", get(list_commits))
         .route("/worktrees/:id/run-script", post(run_script))
         .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
@@ -696,6 +697,31 @@ async fn list_files(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<
     let worktree = fetch_worktree(&pool, id).await?;
     let files = crate::git::list_files(std::path::Path::new(&worktree.path)).await?;
     Ok(Json(files))
+}
+
+#[derive(Deserialize)]
+struct FileContentParams {
+    path: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FileContentResponse {
+    path: String,
+    content: String,
+}
+
+/// Backs the in-app file viewer tab (clicking a file in FilesPanel). Text
+/// only — binary/oversized files return a clean 422 rather than dumping
+/// bytes the frontend can't render, per `git::read_file`'s doc comment.
+async fn read_worktree_file(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<FileContentParams>,
+) -> Result<Json<FileContentResponse>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    let content = crate::git::read_file(std::path::Path::new(&worktree.path), &params.path).await?;
+    Ok(Json(FileContentResponse { path: params.path, content }))
 }
 
 async fn list_commits(

@@ -333,3 +333,40 @@ pub async fn list_files(worktree_path: &Path) -> Result<Vec<String>> {
     paths.dedup();
     Ok(paths)
 }
+
+/// 1MB cap for the in-app file viewer — enough for any real source file,
+/// small enough that a stray huge log/data file doesn't jam the response.
+const MAX_PREVIEW_BYTES: u64 = 1_000_000;
+
+/// Reads a worktree-relative file's content for the in-app viewer.
+/// `rel_path` is user-suppliable (a query param), unlike `list_files`'s
+/// trusted `git ls-files` output, so it gets its own containment check on
+/// top of `validate_path`'s absolute+no-`..` rule: `Path::join` silently
+/// *replaces* the base when the joined-in path is itself absolute, so a
+/// leading `/` is rejected before join, and the final resolved path is
+/// canonicalized (resolving symlinks) and checked to still live under the
+/// worktree root.
+pub async fn read_file(worktree_path: &Path, rel_path: &str) -> Result<String> {
+    if rel_path.is_empty() || rel_path.starts_with('/') {
+        return Err(DomainError::Invalid(format!("invalid file path: {rel_path}")));
+    }
+    let full = worktree_path.join(rel_path);
+    validate_path(&full)?;
+
+    let canonical_root = tokio::fs::canonicalize(worktree_path).await.map_err(DomainError::Io)?;
+    let canonical_file = tokio::fs::canonicalize(&full).await.map_err(DomainError::Io)?;
+    if !canonical_file.starts_with(&canonical_root) {
+        return Err(DomainError::Invalid(format!("path escapes worktree: {rel_path}")));
+    }
+
+    let meta = tokio::fs::metadata(&canonical_file).await.map_err(DomainError::Io)?;
+    if !meta.is_file() {
+        return Err(DomainError::Invalid(format!("not a file: {rel_path}")));
+    }
+    if meta.len() > MAX_PREVIEW_BYTES {
+        return Err(DomainError::Invalid(format!("file too large to preview ({} bytes)", meta.len())));
+    }
+
+    let bytes = tokio::fs::read(&canonical_file).await.map_err(DomainError::Io)?;
+    String::from_utf8(bytes).map_err(|_| DomainError::Invalid("file is not text (binary?)".to_string()))
+}

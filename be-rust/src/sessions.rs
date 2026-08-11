@@ -113,6 +113,12 @@ async fn create_session(
     .execute(&state.pool)
     .await?;
 
+    // The prompt only ever reaches the CLI as a spawn argument — nothing in
+    // its own stdout echoes it back, so without persisting it explicitly the
+    // transcript would show every Claude reply with no question attached.
+    persist_event(&state.pool, id, &AgentEvent::MessageDelta { session_id: id, role: "user".to_string(), text: body.prompt.clone() })
+        .await;
+
     let adapter = resolve_adapter(&state.pool, state.pm.clone(), &body.agent_definition_id).await?;
     let start_result = adapter
         .start(StartConfig {
@@ -197,6 +203,23 @@ async fn apply_status_transition(pool: &PgPool, session_id: Uuid, event: &AgentE
     }
 }
 
+/// Durably records one event — shared by the adapter-event reader below and
+/// by the user's own turns (`create_session`, `reply`), which have no
+/// adapter stream of their own to flow through.
+async fn persist_event(pool: &PgPool, session_id: Uuid, event: &AgentEvent) {
+    let payload = serde_json::to_value(event).unwrap_or(serde_json::json!({}));
+    let _ = sqlx::query(
+        "INSERT INTO session_events (id, session_id, event_type, payload, created_at)
+         VALUES ($1, $2, $3, $4, now())",
+    )
+    .bind(Uuid::new_v4())
+    .bind(session_id)
+    .bind(event_type_tag(event))
+    .bind(payload)
+    .execute(pool)
+    .await;
+}
+
 /// Single reader of an adapter's event channel: writes each event durably
 /// (session_events) before republishing to the SSE bus — phase-r4.2's
 /// ordering guarantee, so a slow/disconnected SSE client never loses history.
@@ -209,18 +232,7 @@ async fn persist_and_broadcast(
     loop {
         match rx.recv().await {
             Ok(event) => {
-                let payload = serde_json::to_value(&event).unwrap_or(serde_json::json!({}));
-                let _ = sqlx::query(
-                    "INSERT INTO session_events (id, session_id, event_type, payload, created_at)
-                     VALUES ($1, $2, $3, $4, now())",
-                )
-                .bind(Uuid::new_v4())
-                .bind(session_id)
-                .bind(event_type_tag(&event))
-                .bind(payload)
-                .execute(&pool)
-                .await;
-
+                persist_event(&pool, session_id, &event).await;
                 apply_status_transition(&pool, session_id, &event).await;
                 let _ = bus_tx.send(event);
             }
@@ -320,8 +332,12 @@ async fn timeline(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Js
             let text = payload.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
             if let Some(last) = out.last_mut() {
                 if last.get("type") == Some(&serde_json::json!("message")) && last.get("role") == Some(&role) {
+                    // Deltas are exact substrings of the final text (own
+                    // embedded whitespace, no separator needed) for Claude's
+                    // token stream; raw_passthrough (agents.rs) embeds its
+                    // own trailing "\n" per line for the same reason.
                     let existing = last.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    last["text"] = serde_json::json!(format!("{existing}\n{text}"));
+                    last["text"] = serde_json::json!(format!("{existing}{text}"));
                     continue;
                 }
             }
@@ -348,6 +364,16 @@ struct ReplyBody {
 async fn reply(State(state): State<AppState>, Path(id): Path<Uuid>, Json(body): Json<ReplyBody>) -> Result<(), AppError> {
     let handles = state.handles.lock().await;
     let handle = handles.get(&id).ok_or(AppError::NotFound)?;
+
+    // Unlike create_session, a live SSE viewer is already connected here —
+    // persisting alone (as at session creation) isn't enough, it also has
+    // to go out over the bus so the open tab shows it without a reload.
+    let user_event = AgentEvent::MessageDelta { session_id: id, role: "user".to_string(), text: body.input.clone() };
+    persist_event(&state.pool, id, &user_event).await;
+    if let Some(bus_tx) = state.buses.lock().await.get(&id) {
+        let _ = bus_tx.send(user_event);
+    }
+
     handle.send(&body.input).await?;
     sqlx::query("UPDATE agent_sessions SET status = 'running' WHERE id = $1").bind(id).execute(&state.pool).await?;
     Ok(())

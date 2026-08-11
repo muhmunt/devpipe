@@ -5,11 +5,24 @@ export type MenuItem = {
   label: string
   onSelect: () => void
   danger?: boolean
+  disabled?: boolean
   icon?: ReactNode
 }
 
 /** Small anchored menu. Closes on outside click, Escape, or selection. */
-export function Menu({ trigger, items, label }: { trigger: ReactNode; items: MenuItem[]; label: string }) {
+export function Menu({
+  trigger,
+  items,
+  label,
+  align = 'right',
+}: {
+  trigger: ReactNode
+  items: MenuItem[]
+  label: string
+  /** Which edge the panel hangs from. Left-aligned menus opened from the
+      left of a scrolling strip would otherwise render off-screen. */
+  align?: 'left' | 'right'
+}) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -46,22 +59,24 @@ export function Menu({ trigger, items, label }: { trigger: ReactNode; items: Men
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 z-30 min-w-[168px] bg-surface-elevated border border-border rounded-md py-1 shadow-lg"
+          className={`absolute ${align === "left" ? "left-0" : "right-0"} top-full mt-1 z-30 min-w-[168px] bg-surface-elevated border border-border rounded-md py-1 shadow-lg`}
         >
           {items.map((item) => (
             <button
               key={item.label}
               type="button"
               role="menuitem"
+              disabled={item.disabled}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
+                if (item.disabled) return
                 setOpen(false)
                 item.onSelect()
               }}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-hover focus-visible:bg-surface-hover active:translate-y-px transition-colors ${
-                item.danger ? 'text-error' : 'text-text'
-              }`}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                item.disabled ? '' : 'hover:bg-surface-hover focus-visible:bg-surface-hover active:translate-y-px'
+              } ${item.danger ? 'text-error' : 'text-text'}`}
             >
               {item.icon}
               {item.label}

@@ -74,11 +74,10 @@ export function Transcript({ entries, agentLabel }: { entries: TimelineEntry[]; 
           return <ToolRow key={i} tool={tool} input={input} output={output} />
         }
 
-        return (
-          <p key={i} className="text-[10px] font-mono text-text-faint uppercase tracking-[0.06em]">
-            {entry.type}
-          </p>
-        )
+        // Anything else is lifecycle signalling that reached the transcript
+        // by mistake. Rendering the raw event name mid-conversation is
+        // worse than rendering nothing.
+        return null
       })}
     </div>
   )

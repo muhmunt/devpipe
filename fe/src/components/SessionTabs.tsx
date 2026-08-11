@@ -27,7 +27,6 @@ export function SessionTabs({
   view,
   onSelect,
   agents,
-  agentId,
   onAgentChange,
   openFiles,
   onCloseFile,
@@ -39,7 +38,6 @@ export function SessionTabs({
   view: MainView
   onSelect: (v: MainView) => void
   agents: Record<string, boolean>
-  agentId: string
   onAgentChange: (v: string) => void
   openFiles: string[]
   onCloseFile: (path: string) => void
@@ -121,36 +119,34 @@ export function SessionTabs({
         )
       })}
 
-      <span className="relative flex items-center gap-1.5 pl-1">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view.kind === 'new'}
-          onClick={() => onSelect({ kind: 'new' })}
-          className={tab(view.kind === 'new')}
-        >
-          <Plus size={12} />
-          <span className="text-[12px]">New chat</span>
-          {view.kind === 'new' && underline}
-        </button>
-        {/* Which agent the next "New chat" tab launches — set here, up
-            front, not buried in the composer after the tab's already open. */}
-        <select
-          value={agentId}
-          onChange={(e) => {
-            onAgentChange(e.target.value)
-            onSelect({ kind: 'new' })
-          }}
-          aria-label="Agent for new chat"
-          className="bg-surface-elevated border border-border rounded-md px-1.5 py-0.5 text-[11px] text-text-muted outline-none focus:border-accent"
-        >
-          {Object.entries(agents).map(([id, available]) => (
-            <option key={id} value={id} disabled={!available}>
-              {id}
-              {available ? '' : ' (not detected)'}
-            </option>
-          ))}
-        </select>
+      {/* One entry point for opening a tab, listing what kinds exist:
+          a chat with any detected agent, or the file browser. A bare select
+          floating in the tab strip made the agent choice look like a filter
+          over the tabs rather than a property of the next chat. */}
+      <span className="relative flex items-center pl-1">
+        <Menu
+          label="Open a new tab"
+          align="left"
+          trigger={
+            <span className={`flex items-center gap-1.5 h-9 px-2.5 ${view.kind === 'new' ? 'text-text' : 'text-text-muted'}`}>
+              <Plus size={13} />
+              <span className="text-[12px]">New tab</span>
+            </span>
+          }
+          items={[
+            ...Object.entries(agents).map(([id, available]) => ({
+              label: available ? `Chat with ${id}` : `Chat with ${id} (not installed)`,
+              icon: <MessageSquare size={12} />,
+              disabled: !available,
+              onSelect: () => {
+                onAgentChange(id)
+                onSelect({ kind: 'new' })
+              },
+            })),
+            { label: 'Browse files', icon: <Files size={12} />, onSelect: () => onSelect({ kind: 'files' }) },
+          ]}
+        />
+        {view.kind === 'new' && underline}
       </span>
 
       {closedSessions.length > 0 && (
