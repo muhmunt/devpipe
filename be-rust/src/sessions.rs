@@ -85,7 +85,34 @@ struct CreateSessionBody {
     agent_definition_id: String,
     model: Option<String>,
     reasoning_level: Option<String>,
+    permission_mode: Option<String>,
     prompt: String,
+    #[serde(default)]
+    attachments: Vec<String>,
+}
+
+/// Attached files are worktree-relative paths picked from the repository's
+/// own file list. Claude resolves `@path` mentions inside a prompt (verified
+/// against a real `claude -p` run), so they're passed as mentions and the
+/// agent reads them itself — inlining file contents into the prompt would
+/// duplicate work the agent's Read tool already does and would blow up the
+/// stored transcript for large files.
+///
+/// The composed text is what gets persisted as the person's turn, so the
+/// transcript shows exactly what the agent was asked, mentions included.
+fn compose_prompt(text: &str, attachments: &[String]) -> Result<String, AppError> {
+    if attachments.is_empty() {
+        return Ok(text.to_string());
+    }
+    for path in attachments {
+        // Attachments name files inside the worktree. An absolute path or a
+        // `..` escape would point the agent at the rest of the disk.
+        if path.is_empty() || path.starts_with('/') || path.split('/').any(|seg| seg == "..") {
+            return Err(AppError::Invalid(format!("attachment must be a path inside the worktree: {path}")));
+        }
+    }
+    let mentions = attachments.iter().map(|p| format!("@{p}")).collect::<Vec<_>>().join("\n");
+    Ok(if text.is_empty() { mentions } else { format!("{text}\n\n{mentions}") })
 }
 
 async fn create_session(
@@ -95,6 +122,9 @@ async fn create_session(
 ) -> Result<Json<AgentSession>, AppError> {
     let worktree = fetch_worktree(&state.pool, worktree_id).await?;
     let repo = fetch_repository(&state.pool, worktree.repository_id).await?;
+    // Validated before the session row is written, so a bad attachment can't
+    // leave a dead session behind.
+    let prompt = compose_prompt(&body.prompt, &body.attachments)?;
 
     let id = Uuid::new_v4();
     let now = Utc::now();
@@ -116,7 +146,7 @@ async fn create_session(
     // The prompt only ever reaches the CLI as a spawn argument — nothing in
     // its own stdout echoes it back, so without persisting it explicitly the
     // transcript would show every Claude reply with no question attached.
-    persist_event(&state.pool, id, &AgentEvent::MessageDelta { session_id: id, role: "user".to_string(), text: body.prompt.clone() })
+    persist_event(&state.pool, id, &AgentEvent::MessageDelta { session_id: id, role: "user".to_string(), text: prompt.clone() })
         .await;
 
     let adapter = resolve_adapter(&state.pool, state.pm.clone(), &body.agent_definition_id).await?;
@@ -126,7 +156,11 @@ async fn create_session(
             worktree_path: std::path::PathBuf::from(&worktree.path),
             model: body.model.clone(),
             reasoning_level: body.reasoning_level.clone(),
-            prompt: body.prompt,
+            // Captured into the resume args at start, so every later turn of
+            // this conversation keeps the permission the chat was opened
+            // with rather than quietly changing it mid-way.
+            permission_mode: body.permission_mode.clone(),
+            prompt,
         })
         .await;
 
@@ -354,27 +388,30 @@ async fn timeline(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Js
 #[derive(Deserialize)]
 struct ReplyBody {
     input: String,
+    #[serde(default)]
+    attachments: Vec<String>,
 }
 
-/// Resolves the needs-input loop (spec §61): while a session is waiting on
-/// the agent, sends the reply through its still-open SessionHandle. Note:
-/// SessionHandle::send is not yet implemented for Claude/Cursor (see
-/// agents.rs doc comment) — this endpoint is wired correctly and will work
-/// once that lands; today it surfaces that as a clean 422, not a crash.
+/// Carries the next turn of a conversation: while a session is waiting, the
+/// reply goes through its still-open SessionHandle. Claude resumes the same
+/// conversation (agents.rs); agents whose CLI has no way to set or recover a
+/// conversation id answer with a clean 422 rather than silently starting a
+/// fresh, context-free chat.
 async fn reply(State(state): State<AppState>, Path(id): Path<Uuid>, Json(body): Json<ReplyBody>) -> Result<(), AppError> {
+    let input = compose_prompt(&body.input, &body.attachments)?;
     let handles = state.handles.lock().await;
     let handle = handles.get(&id).ok_or(AppError::NotFound)?;
 
     // Unlike create_session, a live SSE viewer is already connected here —
     // persisting alone (as at session creation) isn't enough, it also has
     // to go out over the bus so the open tab shows it without a reload.
-    let user_event = AgentEvent::MessageDelta { session_id: id, role: "user".to_string(), text: body.input.clone() };
+    let user_event = AgentEvent::MessageDelta { session_id: id, role: "user".to_string(), text: input.clone() };
     persist_event(&state.pool, id, &user_event).await;
     if let Some(bus_tx) = state.buses.lock().await.get(&id) {
         let _ = bus_tx.send(user_event);
     }
 
-    handle.send(&body.input).await?;
+    handle.send(&input).await?;
     sqlx::query("UPDATE agent_sessions SET status = 'running' WHERE id = $1").bind(id).execute(&state.pool).await?;
     Ok(())
 }

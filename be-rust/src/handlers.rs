@@ -30,6 +30,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/worktrees/:id/run-script", post(run_script))
         .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
         .route("/agents/detect", get(detect_agents))
+        .route("/agents/catalog", get(agent_catalog))
         .route("/editors/detect", get(detect_editors))
         .route("/commands", get(list_commands).post(create_command))
         .route("/fs/browse", get(browse_fs))
@@ -812,6 +813,60 @@ async fn detect_agents(State(pool): State<PgPool>) -> Result<Json<std::collectio
         result.insert(id, crate::agents::detect_executable(&executable).await);
     }
     Ok(Json(result))
+}
+
+/// What each installed agent can actually be asked to do, so the composer's
+/// model / effort / attach controls are built from the agents present on
+/// this machine rather than from a hardcoded list that might not match.
+/// Every field is derived from something real: `--help` for Claude's
+/// documented aliases, `--list-models` for Cursor's per-account list, and
+/// which adapters implement `send()`/`@file` mentions for the two capability
+/// flags. An agent that supports nothing gets empty lists and the UI hides
+/// those controls rather than showing choices that would fail at spawn.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentCatalogEntry {
+    id: String,
+    name: String,
+    available: bool,
+    models: Vec<String>,
+    efforts: Vec<String>,
+    permission_modes: Vec<String>,
+    supports_multi_turn: bool,
+    supports_attachments: bool,
+}
+
+async fn agent_catalog(State(pool): State<PgPool>) -> Result<Json<Vec<AgentCatalogEntry>>, AppError> {
+    let rows = sqlx::query("SELECT id, name, executable FROM agent_definitions ORDER BY id").fetch_all(&pool).await?;
+    let mut out = Vec::new();
+    for row in rows {
+        let id: String = row.get("id");
+        let executable: String = row.get("executable");
+        let available = crate::agents::detect_executable(&executable).await;
+        let (models, efforts, permission_modes) = match (id.as_str(), available) {
+            ("claude", true) => (
+                crate::agents::CLAUDE_MODELS.iter().map(|m| m.to_string()).collect(),
+                crate::agents::CLAUDE_EFFORTS.iter().map(|e| e.to_string()).collect(),
+                crate::agents::CLAUDE_PERMISSION_MODES.iter().map(|m| m.to_string()).collect(),
+            ),
+            ("cursor", true) => (crate::agents::cursor_models().await, vec![], vec![]),
+            _ => (vec![], vec![], vec![]),
+        };
+        out.push(AgentCatalogEntry {
+            name: row.get("name"),
+            available,
+            models,
+            efforts,
+            permission_modes,
+            // Only Claude's CLI lets us set the conversation id up front
+            // (`--session-id`), which is what makes later turns resumable;
+            // and only Claude's prompt syntax resolves `@path` mentions.
+            supports_multi_turn: id == "claude",
+            supports_attachments: id == "claude",
+            id,
+        });
+    }
+    Ok(Json(out))
 }
 
 async fn detect_editors() -> Json<crate::editors::EditorAvailability> {

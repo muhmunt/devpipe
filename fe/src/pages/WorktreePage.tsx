@@ -13,7 +13,15 @@ import { StatusBar } from '@/components/StatusBar'
 import { Transcript } from '@/components/Transcript'
 import { api } from '@/lib/api'
 import { addTab } from '@/lib/tabs'
-import type { AgentEvent, AgentSession, Repository, TimelineEntry, Worktree } from '@/lib/types'
+import type {
+  AgentCatalogEntry,
+  AgentEvent,
+  AgentSession,
+  Repository,
+  TimelineEntry,
+  ToolEntry,
+  Worktree,
+} from '@/lib/types'
 
 const SSE_EVENT_NAMES = [
   'session_started',
@@ -31,10 +39,6 @@ const SSE_EVENT_NAMES = [
 
 const RUNNING = new Set(['starting', 'running'])
 
-// Only these belong in the conversation. Lifecycle events are status, not
-// content — see applyEvents.
-const VISIBLE_IN_TRANSCRIPT = new Set(['needs_input', 'tool_started', 'tool_output'])
-
 export default function WorktreePage() {
   const { id } = useParams<{ id: string }>()
   const [worktree, setWorktree] = useState<Worktree | null>(null)
@@ -47,8 +51,18 @@ export default function WorktreePage() {
   const [entries, setEntries] = useState<TimelineEntry[]>([])
   const [loadingTimeline, setLoadingTimeline] = useState(false)
   const [agentId, setAgentId] = useState('claude')
+  const [model, setModel] = useState('')
+  const [effort, setEffort] = useState('')
+  // Claude's own default refuses every edit and command in a headless run,
+  // which reads as a broken agent rather than as a safety setting. This is
+  // the weakest mode that lets a chat actually do the work it was opened
+  // for; the isolated worktree is what makes it safe, and it can be dialled
+  // up or down per chat.
+  const [permissionMode, setPermissionMode] = useState('acceptEdits')
+  const [attachments, setAttachments] = useState<string[]>([])
   const [prompt, setPrompt] = useState('')
-  const [agents, setAgents] = useState<Record<string, boolean>>({})
+  const [catalog, setCatalog] = useState<AgentCatalogEntry[]>([])
+  const [files, setFiles] = useState<string[]>([])
   const [composerError, setComposerError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
@@ -70,7 +84,24 @@ export default function WorktreePage() {
             continue
           }
           next.push({ type: 'message', role: ev.role, text: ev.text })
-        } else if (VISIBLE_IN_TRANSCRIPT.has(ev.type)) {
+        } else if (ev.type === 'tool_started') {
+          next.push({ type: 'tool', callId: ev.call_id, tool: ev.tool, input: ev.input })
+        } else if (ev.type === 'tool_output') {
+          // A tool's result arrives long after it was announced. Folding the
+          // two into one row by the agent's own call id is what makes a run
+          // read as "Read note.txt ✓" rather than as the same call listed
+          // twice. Sessions recorded before call ids existed have none, so
+          // they fall back to a standalone row instead of merging into an
+          // unrelated call.
+          const at = ev.call_id
+            ? next.findIndex((e) => e.type === 'tool' && (e as ToolEntry).callId === ev.call_id)
+            : -1
+          if (at >= 0) {
+            next[at] = { ...(next[at] as ToolEntry), output: ev.output, isError: ev.is_error }
+          } else {
+            next.push({ type: 'tool', callId: ev.call_id, tool: ev.tool, output: ev.output, isError: ev.is_error })
+          }
+        } else if (ev.type === 'needs_input') {
           next.push({ ...ev } as TimelineEntry)
         }
         // Everything else (session_started/idle/completed/error,
@@ -136,7 +167,10 @@ export default function WorktreePage() {
       })
       .catch(() => setSessions([]))
 
-    api.detectAgents().then(setAgents).catch(() => setAgents({}))
+    // The attach menu offers this branch's tracked files, so it can only
+    // suggest paths that exist for the agent to read.
+    api.listFiles(id).then(setFiles).catch(() => setFiles([]))
+    api.agentCatalog().then(setCatalog).catch(() => setCatalog([]))
     return () => esRef.current?.close()
   }, [id])
 
@@ -173,6 +207,18 @@ export default function WorktreePage() {
     return () => clearTimeout(t)
   }, [activeSessionId, connectStream])
 
+  // Default to whichever agent is actually installed. Claude is the first
+  // choice because it's the only adapter that can hold a conversation, but
+  // defaulting to it on a machine without it would offer a chat that can't
+  // start.
+  useEffect(() => {
+    if (!catalog.length) return
+    setAgentId((current) => {
+      if (catalog.some((a) => a.id === current && a.available)) return current
+      return catalog.find((a) => a.available)?.id ?? current
+    })
+  }, [catalog])
+
   // Keep the session record (status, agent) in sync without touching the
   // transcript — status changes must never re-run the stream effect.
   useEffect(() => {
@@ -202,15 +248,27 @@ export default function WorktreePage() {
       const continuing = view.kind === 'session' && (session?.status === 'needs_input' || session?.status === 'waiting')
       if (continuing && session) {
         const text = prompt.trim()
+        const attached = attachments
         setPrompt('')
-        await api.reply(session.id, text)
+        setAttachments([])
+        await api.reply(session.id, text, attached)
         setSession((s) => (s ? { ...s, status: 'running' } : s))
         return
       }
       // Starting a chat adds to this worktree's list rather than replacing
-      // whatever was open.
-      const created = await api.createSession(id, { agentDefinitionId: agentId, prompt: prompt.trim() })
+      // whatever was open. Model and thinking level are properties of the
+      // chat being started, so they travel with it and stay fixed for its
+      // whole life — the server records both on the session row.
+      const created = await api.createSession(id, {
+        agentDefinitionId: agentId,
+        model: model || undefined,
+        reasoningLevel: effort || undefined,
+        permissionMode: permissionMode || undefined,
+        prompt: prompt.trim(),
+        attachments,
+      })
       setPrompt('')
+      setAttachments([])
       setSessions((prev) => [created, ...prev])
       setSession(created)
       // Switching the view is enough: the stream effect connects, and the
@@ -274,9 +332,14 @@ export default function WorktreePage() {
 
   const composerBusy = view.kind === 'session' && session ? RUNNING.has(session.status) : false
   const lastEntry = entries[entries.length - 1]
+  // Something is already visibly happening when text is streaming in or a
+  // tool is mid-run — both say "working" better than a spinner would, so the
+  // spinner is only for the genuinely silent gap before either starts.
   const agentIsStreaming =
     lastEntry?.type === 'message' && 'role' in lastEntry && (lastEntry as { role: string }).role === 'agent'
-  const awaitingReply = composerBusy && !agentIsStreaming
+  const toolIsRunning = lastEntry?.type === 'tool' && (lastEntry as ToolEntry).output === undefined
+  const awaitingReply = composerBusy && !agentIsStreaming && !toolIsRunning
+  const agentName = catalog.find((a) => a.id === (session?.agentDefinitionId ?? agentId))?.name ?? agentId
 
   return (
     <AppShell
@@ -296,7 +359,7 @@ export default function WorktreePage() {
             closedSessionIds={closedSessionIds}
             view={view}
             onSelect={setView}
-            agents={agents}
+            catalog={catalog}
             onAgentChange={setAgentId}
             openFiles={openFiles}
             onCloseFile={closeFile}
@@ -329,14 +392,22 @@ export default function WorktreePage() {
                 {loadingTimeline && <SkeletonRows rows={5} />}
 
                 {!loadingTimeline && entries.length === 0 && (
-                  <p className="text-text-faint text-center py-16">
-                    {view.kind === 'new' ? 'Describe a task below to start a new chat.' : 'No messages in this chat.'}
-                  </p>
+                  <div className="text-center py-16">
+                    {view.kind === 'new' ? (
+                      <>
+                        <p className="text-text-muted">Start a chat on this branch</p>
+                        <p className="text-text-faint text-[12px] mt-1">
+                          {agentName} works in <span className="font-mono">{worktree.branch}</span> only — nothing it does
+                          here touches your other branches.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-text-faint">Nothing was said in this chat.</p>
+                    )}
+                  </div>
                 )}
 
-                {!loadingTimeline && entries.length > 0 && (
-                  <Transcript entries={entries} agentLabel={(session?.agentDefinitionId ?? agentId).toUpperCase()} />
-                )}
+                {!loadingTimeline && entries.length > 0 && <Transcript entries={entries} agentLabel={agentName} />}
 
                 {/* The agent is silent for several seconds before its first
                     token. Without this the app looks like it swallowed the
@@ -345,7 +416,7 @@ export default function WorktreePage() {
                 {awaitingReply && (
                   <div className="flex items-center gap-2 text-text-faint">
                     <Loader2 size={12} className="animate-spin" />
-                    <span className="text-[12px]">{(session?.agentDefinitionId ?? agentId)} is working</span>
+                    <span className="text-[12px]">{agentName} is thinking</span>
                   </div>
                 )}
               </div>
@@ -358,9 +429,18 @@ export default function WorktreePage() {
                   onChange={setPrompt}
                   onSubmit={submitComposer}
                   textareaRef={composerRef}
-                  agents={agents}
+                  catalog={catalog}
                   agentId={agentId}
                   onAgentChange={setAgentId}
+                  model={model}
+                  onModelChange={setModel}
+                  effort={effort}
+                  onEffortChange={setEffort}
+                  permissionMode={permissionMode}
+                  onPermissionModeChange={setPermissionMode}
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                  files={files}
                   repository={repository}
                   busy={composerBusy}
                   replying={view.kind === 'session' && (session?.status === 'needs_input' || session?.status === 'waiting')}

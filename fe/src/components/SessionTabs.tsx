@@ -1,14 +1,18 @@
 /* devpipe · design-system: design.md */
 import { FileCode, Files, History, MessageSquare, Plus, X } from 'lucide-react'
 import { Menu } from '@/components/Menu'
-import type { AgentSession } from '@/lib/types'
+import type { AgentCatalogEntry, AgentSession } from '@/lib/types'
 
 export type MainView = { kind: 'session'; id: string } | { kind: 'new' } | { kind: 'files' } | { kind: 'file'; path: string }
 
-function label(session: AgentSession): string {
+/** Agent plus start time — both real fields. A tab is never given an
+    invented title, because the only thing that could generate one is the
+    conversation, and reading it to name it would be a guess. */
+function label(session: AgentSession, catalog: AgentCatalogEntry[]): string {
+  const name = catalog.find((a) => a.id === session.agentDefinitionId)?.name ?? session.agentDefinitionId
   const t = session.startedAt ? new Date(session.startedAt) : null
-  const time = t ? t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'pending'
-  return `${session.agentDefinitionId} · ${time}`
+  const time = t ? t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'starting'
+  return `${name} · ${time}`
 }
 
 function basename(path: string): string {
@@ -26,7 +30,7 @@ export function SessionTabs({
   closedSessionIds,
   view,
   onSelect,
-  agents,
+  catalog,
   onAgentChange,
   openFiles,
   onCloseFile,
@@ -37,7 +41,7 @@ export function SessionTabs({
   closedSessionIds: Set<string>
   view: MainView
   onSelect: (v: MainView) => void
-  agents: Record<string, boolean>
+  catalog: AgentCatalogEntry[]
   onAgentChange: (v: string) => void
   openFiles: string[]
   onCloseFile: (path: string) => void
@@ -66,7 +70,7 @@ export function SessionTabs({
               className="flex items-center gap-1.5"
             >
               <MessageSquare size={12} className={active ? 'text-accent' : 'text-text-faint'} />
-              <span className="text-[12px]">{label(s)}</span>
+              <span className="text-[12px]">{label(s, catalog)}</span>
             </button>
             <button
               type="button"
@@ -74,7 +78,7 @@ export function SessionTabs({
                 e.stopPropagation()
                 onCloseSession(s.id)
               }}
-              aria-label={`Close ${label(s)}`}
+              aria-label={`Close ${label(s, catalog)}`}
               className="text-text-faint hover:text-text active:translate-y-px rounded p-0.5"
             >
               <X size={11} />
@@ -134,12 +138,12 @@ export function SessionTabs({
             </span>
           }
           items={[
-            ...Object.entries(agents).map(([id, available]) => ({
-              label: available ? `Chat with ${id}` : `Chat with ${id} (not installed)`,
+            ...catalog.map((a) => ({
+              label: a.available ? `New chat with ${a.name}` : `${a.name} — not installed`,
               icon: <MessageSquare size={12} />,
-              disabled: !available,
+              disabled: !a.available,
               onSelect: () => {
-                onAgentChange(id)
+                onAgentChange(a.id)
                 onSelect({ kind: 'new' })
               },
             })),
@@ -161,7 +165,7 @@ export function SessionTabs({
               </span>
             }
             items={closedSessions.map((s) => ({
-              label: label(s),
+              label: label(s, catalog),
               icon: <MessageSquare size={12} />,
               onSelect: () => onReopenSession(s.id),
             }))}

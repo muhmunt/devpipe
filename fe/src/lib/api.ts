@@ -1,4 +1,5 @@
 import type {
+  AgentCatalogEntry,
   AgentDefinition,
   AgentSession,
   Command,
@@ -96,6 +97,7 @@ export const api = {
   createAgentDefinition: (body: { id: string; name: string; executable: string; defaultArgs: string[] }) =>
     request<AgentDefinition>('/agent-definitions', { method: 'POST', body: JSON.stringify(body) }),
   detectAgents: () => request<Record<string, boolean>>('/agents/detect'),
+  agentCatalog: () => request<AgentCatalogEntry[]>('/agents/catalog'),
   detectEditors: () => request<EditorAvailability>('/editors/detect'),
 
   listCommands: (params: { workspaceId?: string; repositoryId?: string }) => {
@@ -112,11 +114,19 @@ export const api = {
 
   createSession: (
     worktreeId: string,
-    body: { agentDefinitionId: string; model?: string; reasoningLevel?: string; prompt: string },
+    body: {
+      agentDefinitionId: string
+      model?: string
+      reasoningLevel?: string
+      permissionMode?: string
+      prompt: string
+      /** Worktree-relative paths; sent to the agent as `@path` mentions. */
+      attachments?: string[]
+    },
   ) => request<AgentSession>(`/worktrees/${worktreeId}/sessions`, { method: 'POST', body: JSON.stringify(body) }),
   getTimeline: (sessionId: string) => request<TimelineEntry[]>(`/sessions/${sessionId}/timeline`),
-  reply: (sessionId: string, input: string) =>
-    request<void>(`/sessions/${sessionId}/reply`, { method: 'POST', body: JSON.stringify({ input }) }),
+  reply: (sessionId: string, input: string, attachments?: string[]) =>
+    request<void>(`/sessions/${sessionId}/reply`, { method: 'POST', body: JSON.stringify({ input, attachments }) }),
   eventsUrl: (sessionId: string, since?: string) =>
     `${BASE}/sessions/${sessionId}/events${since ? `?since=${encodeURIComponent(since)}` : ''}`,
 }

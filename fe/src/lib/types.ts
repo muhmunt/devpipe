@@ -113,8 +113,8 @@ export type Diff = {
 export type AgentEvent =
   | { type: 'session_started'; session_id: string }
   | { type: 'message_delta'; session_id: string; role: string; text: string }
-  | { type: 'tool_started'; session_id: string; tool: string; input: unknown }
-  | { type: 'tool_output'; session_id: string; tool: string; output: string }
+  | { type: 'tool_started'; session_id: string; call_id: string; tool: string; input: unknown }
+  | { type: 'tool_output'; session_id: string; call_id: string; tool: string; output: string; is_error: boolean }
   | { type: 'file_changed'; session_id: string; path: string }
   | { type: 'needs_input'; session_id: string; question: string }
   | { type: 'usage_updated'; session_id: string; tokens: number | null }
@@ -122,8 +122,34 @@ export type AgentEvent =
   | { type: 'session_completed'; session_id: string; exit_code: number }
   | { type: 'session_error'; session_id: string; message: string }
 
+/** What one agent can be asked to do, measured on this machine. */
+export type AgentCatalogEntry = {
+  id: string
+  name: string
+  available: boolean
+  /** Empty when the agent exposes no model choice — hide the picker. */
+  models: string[]
+  /** Empty when the agent has no effort/thinking setting. */
+  efforts: string[]
+  /** How much the agent may do unattended. Empty when not configurable. */
+  permissionModes: string[]
+  supportsMultiTurn: boolean
+  supportsAttachments: boolean
+}
+
+/** One tool call, folded from its start event and its later result. */
+export type ToolEntry = {
+  type: 'tool'
+  callId: string
+  tool: string
+  input?: unknown
+  output?: string
+  isError?: boolean
+}
+
 export type TimelineEntry =
   | { type: 'message'; role: string; text: string }
+  | ToolEntry
   | ({ type: string } & Record<string, unknown>)
 
 export type Commit = {

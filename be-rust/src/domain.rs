@@ -229,8 +229,11 @@ pub struct Command {
 pub enum AgentEvent {
     SessionStarted { session_id: Uuid },
     MessageDelta { session_id: Uuid, role: String, text: String },
-    ToolStarted { session_id: Uuid, tool: String, input: serde_json::Value },
-    ToolOutput { session_id: Uuid, tool: String, output: String },
+    /// `call_id` is the agent's own id for this tool call (Claude's
+    /// `toolu_...`), carried so the UI can fold a start and its later result
+    /// into one row instead of showing the same call twice.
+    ToolStarted { session_id: Uuid, call_id: String, tool: String, input: serde_json::Value },
+    ToolOutput { session_id: Uuid, call_id: String, tool: String, output: String, is_error: bool },
     FileChanged { session_id: Uuid, path: String },
     NeedsInput { session_id: Uuid, question: String },
     UsageUpdated { session_id: Uuid, tokens: Option<u64> },
@@ -287,6 +290,11 @@ pub struct StartConfig {
     pub worktree_path: PathBuf,
     pub model: Option<String>,
     pub reasoning_level: Option<String>,
+    /// How much the agent may do without being asked. There is no one to ask
+    /// in a headless run — an unapproved tool call comes back denied — so
+    /// this is the difference between an agent that can change the worktree
+    /// and one that can only read it.
+    pub permission_mode: Option<String>,
     pub prompt: String,
 }
 
