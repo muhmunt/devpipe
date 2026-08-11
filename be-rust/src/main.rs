@@ -2,6 +2,7 @@ mod agents;
 mod db;
 mod domain;
 mod editors;
+mod fsbrowse;
 mod error;
 mod git;
 mod handlers;

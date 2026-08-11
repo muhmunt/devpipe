@@ -3,6 +3,7 @@ import type {
   AgentSession,
   Command,
   CommandScope,
+  BrowseResult,
   Commit,
   Diff,
   EditorAvailability,
@@ -34,12 +35,16 @@ export const api = {
     request<Workspace>('/workspaces', { method: 'POST', body: JSON.stringify(body) }),
   getWorkspace: (id: string) => request<Workspace>(`/workspaces/${id}`),
   deleteWorkspace: (id: string) => request<void>(`/workspaces/${id}`, { method: 'DELETE' }),
+  renameWorkspace: (id: string, name: string) =>
+    request<Workspace>(`/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
+  browse: (path?: string) =>
+    request<BrowseResult>(`/fs/browse${path ? `?path=${encodeURIComponent(path)}` : ''}`),
   /// Creates workspace + first repository atomically (open an existing repo,
   /// or clone one first). Replaces the old two-call flow, which orphaned an
   /// empty workspace whenever the repository step failed.
   initWorkspace: (body: {
     name: string
-    source: 'open' | 'clone'
+    source: 'open' | 'clone' | 'new'
     path: string
     cloneUrl?: string
     defaultBranch?: string
@@ -61,6 +66,13 @@ export const api = {
   ) => request<Repository>(`/repositories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 
   listWorktrees: (repositoryId: string) => request<Worktree[]>(`/repositories/${repositoryId}/worktrees`),
+  listBranches: (repositoryId: string) => request<string[]>(`/repositories/${repositoryId}/branches`),
+  renameRepository: (id: string, name: string) =>
+    request<Repository>(`/repositories/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
+  deleteRepository: (id: string) => request<void>(`/repositories/${id}`, { method: 'DELETE' }),
+  updateWorktree: (id: string, body: { pinned?: boolean; favorite?: boolean; targetBranch?: string }) =>
+    request<Worktree>(`/worktrees/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  listWorktreeSessions: (id: string) => request<AgentSession[]>(`/worktrees/${id}/sessions`),
   createWorktree: (repositoryId: string, body: { branch: string; targetBranch?: string }) =>
     request<Worktree>(`/repositories/${repositoryId}/worktrees`, { method: 'POST', body: JSON.stringify(body) }),
   getWorktree: (id: string) => request<Worktree>(`/worktrees/${id}`),

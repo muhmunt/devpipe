@@ -1,145 +1,122 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { GitBranch, Settings2, Star } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
+import { SkeletonRows } from '@/components/Skeleton'
 import { api } from '@/lib/api'
 import { addTab } from '@/lib/tabs'
+import { relativeTime } from '@/lib/time'
 import type { Repository, Worktree } from '@/lib/types'
 
-const WORKTREE_STATUS_COLOR: Record<Worktree['status'], string> = {
+const STATUS_COLOR: Record<Worktree['status'], string> = {
   clean: 'bg-success',
   modified: 'bg-warning',
   conflicted: 'bg-error',
   ahead: 'bg-accent',
-  behind: 'bg-text-muted',
+  behind: 'bg-text-faint',
 }
 
-// spec §86 "Repository" — primary + task worktrees per repository, per the
-// Workspace -> Repository -> Worktree hierarchy (spec §5).
+// Overview of a workspace's repositories and their worktrees. Creating
+// projects and worktrees happens in the sidebar, so this page reads rather
+// than duplicating those forms.
 export default function RepositoryPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>()
-  const [repos, setRepos] = useState<Repository[]>([])
+  const [repos, setRepos] = useState<Repository[] | null>(null)
   const [worktrees, setWorktrees] = useState<Record<string, Worktree[]>>({})
-  const [form, setForm] = useState({ name: '', localPath: '', defaultBranch: 'main' })
-  const [branchForm, setBranchForm] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
 
-  function load() {
+  useEffect(() => {
     if (!workspaceId) return
-    api.listRepositories(workspaceId).then(async (rs) => {
-      setRepos(rs)
-      const pairs = await Promise.all(rs.map((r) => api.listWorktrees(r.id).then((wts) => [r.id, wts] as const)))
-      setWorktrees(Object.fromEntries(pairs))
-    })
-  }
-
-  useEffect(load, [workspaceId])
-
-  async function createRepository(e: React.FormEvent) {
-    e.preventDefault()
-    if (!workspaceId || !form.name.trim() || !form.localPath.trim()) return
-    try {
-      await api.createRepository({
-        workspaceId,
-        name: form.name.trim(),
-        localPath: form.localPath.trim(),
-        defaultBranch: form.defaultBranch.trim() || 'main',
+    api
+      .listRepositories(workspaceId)
+      .then(async (rs) => {
+        setRepos(rs)
+        const pairs = await Promise.all(rs.map((r) => api.listWorktrees(r.id).then((w) => [r.id, w] as const)))
+        setWorktrees(Object.fromEntries(pairs))
       })
-      setForm({ name: '', localPath: '', defaultBranch: 'main' })
-      load()
-    } catch (e) {
-      setError(String((e as Error).message ?? e))
-    }
-  }
-
-  async function createWorktree(repoId: string) {
-    const branch = branchForm[repoId]?.trim()
-    if (!branch) return
-    try {
-      const wt = await api.createWorktree(repoId, { branch })
-      setWorktrees((prev) => ({ ...prev, [repoId]: [...(prev[repoId] ?? []), wt] }))
-      setBranchForm((prev) => ({ ...prev, [repoId]: '' }))
-    } catch (e) {
-      setError(String((e as Error).message ?? e))
-    }
-  }
+      .catch((e) => {
+        setError(String((e as Error).message ?? e))
+        setRepos([])
+      })
+  }, [workspaceId])
 
   return (
     <AppShell>
-      <div className="p-6 max-w-[760px]">
-        <div className="flex items-center justify-between">
-          <Link to="/" className="text-xs text-text-muted hover:text-text">
-            ← Workspaces
+      <div className="h-full flex flex-col min-h-0">
+        <header className="shrink-0 px-6 h-11 flex items-center justify-between border-b border-border">
+          <h1 className="font-medium">Projects</h1>
+          <Link
+            to={`/workspaces/${workspaceId}/observability`}
+            className="text-text-muted hover:text-text transition-colors"
+          >
+            Observability
           </Link>
-          <Link to={`/workspaces/${workspaceId}/observability`} className="text-xs text-text-muted hover:text-text">
-            Observability →
-          </Link>
-        </div>
-        <h1 className="text-lg font-medium mt-2 mb-4">Repositories</h1>
+        </header>
 
-        <form onSubmit={createRepository} className="grid grid-cols-3 gap-2 mb-6">
-          <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Name"
-            className="bg-surface border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent"
-          />
-          <input
-            value={form.localPath}
-            onChange={(e) => setForm({ ...form, localPath: e.target.value })}
-            placeholder="Local path (/abs/path)"
-            className="bg-surface border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent font-mono"
-          />
-          <button type="submit" className="flex items-center justify-center gap-1.5 bg-action-strong text-white px-3 py-2 rounded-md text-sm">
-            <Plus size={14} /> Add repo
-          </button>
-        </form>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="w-full max-w-[760px] px-6 py-6 space-y-4">
+            {error && (
+              <p role="alert" className="text-[12px] text-error bg-error/10 border border-error/30 rounded-md px-2.5 py-2">
+                {error}
+              </p>
+            )}
 
-        {error && <p className="text-error text-sm mb-4">{error}</p>}
-
-        <div className="space-y-4">
-          {repos.map((repo) => (
-            <div key={repo.id} className="border border-border rounded-lg overflow-hidden">
-              <div className="px-4 py-3 border-b border-border bg-surface flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium">{repo.name}</div>
-                  <div className="text-xs text-text-muted font-mono">{repo.localPath}</div>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    value={branchForm[repo.id] ?? ''}
-                    onChange={(e) => setBranchForm((prev) => ({ ...prev, [repo.id]: e.target.value }))}
-                    placeholder="feature/branch"
-                    className="bg-surface-elevated border border-border rounded-md px-2 py-1 text-xs font-mono outline-none focus:border-accent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => createWorktree(repo.id)}
-                    className="text-xs bg-action-strong text-white px-2 py-1 rounded-md"
-                  >
-                    New worktree
-                  </button>
-                </div>
+            {!repos ? (
+              <SkeletonRows rows={4} />
+            ) : repos.length === 0 ? (
+              <div className="border border-dashed border-border rounded-lg px-4 py-10 text-center">
+                <p className="text-text-muted">No projects in this workspace.</p>
+                <p className="text-text-faint text-[12px] mt-1">Add one from the sidebar.</p>
               </div>
-              <div className="divide-y divide-border">
-                {(worktrees[repo.id] ?? []).map((wt) => (
-                  <Link
-                    key={wt.id}
-                    to={`/worktrees/${wt.id}`}
-                    onClick={() => addTab({ id: wt.id, branch: wt.branch })}
-                    className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-surface"
-                  >
-                    <span className={`size-1.5 rounded-full shrink-0 ${WORKTREE_STATUS_COLOR[wt.status]}`} aria-hidden />
-                    <span className="font-mono text-xs">{wt.branch}</span>
-                    <span className="text-text-muted text-xs ml-auto">{wt.status}</span>
-                  </Link>
-                ))}
-                {(worktrees[repo.id] ?? []).length === 0 && (
-                  <div className="px-4 py-3 text-xs text-text-muted">No task worktrees yet</div>
-                )}
-              </div>
-            </div>
-          ))}
+            ) : (
+              repos.map((repo) => (
+                <section key={repo.id} className="border border-border rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-surface flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{repo.name}</div>
+                      <div className="text-[12px] text-text-faint font-mono truncate">{repo.localPath}</div>
+                    </div>
+                    <Link
+                      to={`/repositories/${repo.id}/settings`}
+                      className="shrink-0 p-1.5 rounded-md text-text-muted hover:text-text hover:bg-surface-hover transition-colors"
+                      aria-label={`${repo.name} settings`}
+                    >
+                      <Settings2 size={14} />
+                    </Link>
+                  </div>
+
+                  <ul className="divide-y divide-border">
+                    {(worktrees[repo.id] ?? []).map((wt) => (
+                      <li key={wt.id}>
+                        <Link
+                          to={`/worktrees/${wt.id}`}
+                          onClick={() => addTab({ id: wt.id, branch: wt.branch })}
+                          className="flex items-center gap-2 px-4 py-2 hover:bg-surface-hover transition-colors"
+                        >
+                          <span className={`size-1.5 rounded-full shrink-0 ${STATUS_COLOR[wt.status]}`} aria-hidden />
+                          <GitBranch size={11} className="shrink-0 text-text-faint" />
+                          <span className="font-mono text-[12px] truncate">{wt.branch}</span>
+                          {wt.kind === 'primary' && <Star size={10} className="shrink-0 text-warning" aria-label="main" />}
+                          <span className="ml-auto shrink-0 flex items-center gap-2">
+                            {(wt.additions || wt.deletions) && (
+                              <span className="font-mono text-[11px] tnum">
+                                <span className="text-success">+{wt.additions ?? 0}</span>{' '}
+                                <span className="text-error">-{wt.deletions ?? 0}</span>
+                              </span>
+                            )}
+                            <span className="text-text-faint text-[11px]">{relativeTime(wt.updatedAt)}</span>
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                    {(worktrees[repo.id] ?? []).length === 0 && (
+                      <li className="px-4 py-3 text-[12px] text-text-faint">No worktrees yet</li>
+                    )}
+                  </ul>
+                </section>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </AppShell>

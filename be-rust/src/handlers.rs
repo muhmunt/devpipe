@@ -12,14 +12,15 @@ use crate::error::AppError;
 pub fn routes() -> Router<crate::state::AppState> {
     Router::new()
         .route("/workspaces", get(list_workspaces).post(create_workspace))
-        .route("/workspaces/:id", get(get_workspace).delete(delete_workspace))
+        .route("/workspaces/:id", get(get_workspace).patch(update_workspace).delete(delete_workspace))
         .route("/workspaces/init", post(init_workspace))
         .route("/workspaces/:id/repositories", get(list_repositories))
         .route("/repositories", post(create_repository))
         .route("/repositories/clone", post(clone_repository))
-        .route("/repositories/:id", get(get_repository).patch(update_repository_scripts))
+        .route("/repositories/:id", get(get_repository).patch(update_repository).delete(delete_repository))
+        .route("/repositories/:id/branches", get(list_branches))
         .route("/repositories/:id/worktrees", get(list_worktrees).post(create_worktree))
-        .route("/worktrees/:id", get(get_worktree).delete(delete_worktree))
+        .route("/worktrees/:id", get(get_worktree).patch(update_worktree).delete(delete_worktree))
         .route("/worktrees/:id/diff", get(diff_worktree))
         .route("/worktrees/:id/commit", post(commit_worktree))
         .route("/worktrees/:id/push", post(push_worktree))
@@ -30,6 +31,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/agents/detect", get(detect_agents))
         .route("/editors/detect", get(detect_editors))
         .route("/commands", get(list_commands).post(create_command))
+        .route("/fs/browse", get(browse_fs))
 }
 
 fn workspace_from_row(row: &sqlx::postgres::PgRow) -> Workspace {
@@ -77,6 +79,8 @@ pub(crate) fn worktree_from_row(row: &sqlx::postgres::PgRow) -> Result<Worktree,
         updated_at: row.get("updated_at"),
         additions: None,
         deletions: None,
+        pinned_at: row.get("pinned_at"),
+        favorite: row.get("favorite"),
     })
 }
 
@@ -157,6 +161,11 @@ async fn init_workspace(
             // Clone first: if it fails, nothing has been written to the DB.
             crate::git::clone(url, path).await?;
         }
+        "new" => {
+            // Creates the directory, git init, and an initial commit. Without
+            // a HEAD the repository cannot have worktrees at all.
+            crate::git::init(path, body.default_branch.as_deref().unwrap_or("main")).await?;
+        }
         "open" => {
             if !path.exists() {
                 return Err(AppError::Invalid(format!("path does not exist: {}", body.path)));
@@ -193,6 +202,9 @@ async fn init_workspace(
     .bind(now)
     .fetch_one(&mut *tx)
     .await?;
+
+    let repo = repository_from_row(&repo_row);
+    insert_primary_worktree(&mut tx, repo.id, &repo.local_path, &repo.default_branch).await?;
 
     tx.commit().await?;
     Ok(Json(InitWorkspaceResponse {
@@ -354,19 +366,26 @@ async fn clone_repository(
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct UpdateRepositoryScriptsBody {
+    name: Option<String>,
     setup_script: Option<String>,
     run_script: Option<String>,
     test_script: Option<String>,
     teardown_script: Option<String>,
 }
 
-async fn update_repository_scripts(
+async fn update_repository(
     State(pool): State<PgPool>,
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateRepositoryScriptsBody>,
 ) -> Result<Json<Repository>, AppError> {
     let row = sqlx::query(
-        "UPDATE repositories SET setup_script = $1, run_script = $2, test_script = $3, teardown_script = $4, updated_at = $5
+        "UPDATE repositories SET
+            name            = COALESCE($7, name),
+            setup_script    = $1,
+            run_script      = $2,
+            test_script     = $3,
+            teardown_script = $4,
+            updated_at      = $5
          WHERE id = $6 RETURNING *",
     )
     .bind(&body.setup_script)
@@ -375,10 +394,133 @@ async fn update_repository_scripts(
     .bind(&body.teardown_script)
     .bind(Utc::now())
     .bind(id)
+    .bind(&body.name)
     .fetch_optional(&pool)
     .await?
     .ok_or(AppError::NotFound)?;
     Ok(Json(repository_from_row(&row)))
+}
+
+/// Shared by every repository-creation path so a repository always has a row
+/// representing its own checkout. Without it the main branch is not
+/// selectable and no session can run against it.
+pub(crate) async fn insert_primary_worktree(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    repository_id: Uuid,
+    local_path: &str,
+    default_branch: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO worktrees (id, repository_id, path, branch, target_branch, kind, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $4, 'primary', 'clean', now(), now())
+         ON CONFLICT (repository_id, path) DO NOTHING",
+    )
+    .bind(Uuid::new_v4())
+    .bind(repository_id)
+    .bind(local_path)
+    .bind(default_branch)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateWorkspaceBody {
+    name: String,
+}
+
+async fn update_workspace(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<UpdateWorkspaceBody>,
+) -> Result<Json<Workspace>, AppError> {
+    let row = sqlx::query("UPDATE workspaces SET name = $1, updated_at = now() WHERE id = $2 RETURNING *")
+        .bind(&body.name)
+        .bind(id)
+        .fetch_optional(&pool)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(workspace_from_row(&row)))
+}
+
+/// Removes devpipe's task worktrees for this repository, then the row. The
+/// repository directory itself is never deleted: devpipe did not create the
+/// user's code.
+async fn delete_repository(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<(), AppError> {
+    let repo = fetch_repository(&pool, id).await?;
+    let rows = sqlx::query("SELECT path FROM worktrees WHERE repository_id = $1 AND kind = 'task'")
+        .bind(id)
+        .fetch_all(&pool)
+        .await?;
+    for row in rows {
+        let wt_path: String = row.get("path");
+        if let Err(e) = crate::git::worktree_remove(
+            std::path::Path::new(&repo.local_path),
+            std::path::Path::new(&wt_path),
+        )
+        .await
+        {
+            eprintln!("repository {id}: could not remove worktree {wt_path}: {e}");
+        }
+    }
+    let result = sqlx::query("DELETE FROM repositories WHERE id = $1").bind(id).execute(&pool).await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+/// Local branches, for the "branch from" picker.
+async fn list_branches(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Json<Vec<String>>, AppError> {
+    let repo = fetch_repository(&pool, id).await?;
+    let branches = crate::git::list_branches(std::path::Path::new(&repo.local_path)).await?;
+    Ok(Json(branches))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateWorktreeBody {
+    pinned: Option<bool>,
+    favorite: Option<bool>,
+    target_branch: Option<String>,
+}
+
+async fn update_worktree(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<UpdateWorktreeBody>,
+) -> Result<Json<Worktree>, AppError> {
+    if let Some(target) = &body.target_branch {
+        crate::git::validate_branch_name(target)?;
+    }
+    let row = sqlx::query(
+        "UPDATE worktrees SET
+            pinned_at     = CASE WHEN $1::bool IS NULL THEN pinned_at
+                                 WHEN $1 THEN COALESCE(pinned_at, now())
+                                 ELSE NULL END,
+            favorite      = COALESCE($2, favorite),
+            target_branch = COALESCE($3, target_branch),
+            updated_at    = now()
+         WHERE id = $4 RETURNING *",
+    )
+    .bind(body.pinned)
+    .bind(body.favorite)
+    .bind(&body.target_branch)
+    .bind(id)
+    .fetch_optional(&pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    Ok(Json(worktree_from_row(&row)?))
+}
+
+async fn browse_fs(Query(params): Query<BrowseParams>) -> Result<Json<crate::fsbrowse::BrowseResult>, AppError> {
+    Ok(Json(crate::fsbrowse::browse(params.path.as_deref()).await?))
+}
+
+#[derive(Deserialize)]
+struct BrowseParams {
+    path: Option<String>,
 }
 
 // --- worktrees ----------------------------------------------------------
@@ -405,7 +547,18 @@ async fn list_worktrees(
     State(pool): State<PgPool>,
     Path(repository_id): Path<Uuid>,
 ) -> Result<Json<Vec<Worktree>>, AppError> {
-    let rows = sqlx::query("SELECT * FROM worktrees WHERE repository_id = $1 AND archived_at IS NULL ORDER BY created_at DESC")
+    // Repositories created before primary worktrees existed have no row for
+    // their own checkout. Create it lazily here rather than in a migration
+    // that would have to guess paths.
+    let repo = fetch_repository(&pool, repository_id).await?;
+    let mut tx = pool.begin().await?;
+    insert_primary_worktree(&mut tx, repo.id, &repo.local_path, &repo.default_branch).await?;
+    tx.commit().await?;
+
+    let rows = sqlx::query(
+        "SELECT * FROM worktrees WHERE repository_id = $1 AND archived_at IS NULL
+         ORDER BY (kind = 'primary') DESC, (pinned_at IS NOT NULL) DESC, pinned_at DESC, updated_at DESC",
+    )
         .bind(repository_id)
         .fetch_all(&pool)
         .await?;
@@ -416,7 +569,14 @@ async fn list_worktrees(
     let stats = futures::future::join_all(worktrees.iter().map(|wt| {
         let path = wt.path.clone();
         let target = wt.target_branch.clone().unwrap_or_else(|| "main".to_string());
-        async move { crate::git::diff_stat(std::path::Path::new(&path), &target).await }
+        let is_primary = wt.kind == crate::domain::WorktreeKind::Primary;
+        async move {
+            if is_primary {
+                (0, 0)
+            } else {
+                crate::git::diff_stat(std::path::Path::new(&path), &target).await
+            }
+        }
     }))
     .await;
 

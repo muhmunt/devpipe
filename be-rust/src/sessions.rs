@@ -24,7 +24,7 @@ pub type HandleRegistry = Arc<Mutex<HashMap<Uuid, Box<dyn SessionHandle>>>>;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/worktrees/:id/sessions", post(create_session))
+        .route("/worktrees/:id/sessions", get(list_worktree_sessions).post(create_session))
         .route("/sessions/:id/events", get(stream_events))
         .route("/sessions/:id/timeline", get(timeline))
         .route("/sessions/:id/reply", post(reply))
@@ -381,6 +381,21 @@ pub async fn reconcile_orphaned_sessions(pool: &PgPool) {
         .await;
         eprintln!("reconciled orphaned session {id} -> failed (server restart)");
     }
+}
+
+/// Every chat that has run against this worktree, newest first, so the UI can
+/// keep them side by side instead of replacing one with the next.
+async fn list_worktree_sessions(
+    State(pool): State<PgPool>,
+    Path(worktree_id): Path<Uuid>,
+) -> Result<Json<Vec<AgentSession>>, AppError> {
+    let rows = sqlx::query(
+        "SELECT * FROM agent_sessions WHERE worktree_id = $1 ORDER BY started_at DESC NULLS LAST",
+    )
+    .bind(worktree_id)
+    .fetch_all(&pool)
+    .await?;
+    Ok(Json(rows.iter().map(session_from_row).collect()))
 }
 
 #[derive(Deserialize)]

@@ -43,6 +43,21 @@ export type Worktree = {
   /** Present only on the list endpoint (sidebar diff stats). */
   additions?: number
   deletions?: number
+  pinnedAt: string | null
+  favorite: boolean
+}
+
+export type DirEntryInfo = {
+  name: string
+  path: string
+  isGitRepo: boolean
+}
+
+export type BrowseResult = {
+  path: string
+  parent: string | null
+  isGitRepo: boolean
+  entries: DirEntryInfo[]
 }
 
 export type AgentDefinition = {

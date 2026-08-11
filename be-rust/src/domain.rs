@@ -130,6 +130,8 @@ pub struct Worktree {
     pub additions: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deletions: Option<u32>,
+    pub pinned_at: Option<DateTime<Utc>>,
+    pub favorite: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

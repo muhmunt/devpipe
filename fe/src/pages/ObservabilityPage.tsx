@@ -30,13 +30,15 @@ export default function ObservabilityPage() {
 
   return (
     <AppShell>
-      <div className="p-6 max-w-[820px]">
-        <button type="button" onClick={() => navigate(-1)} className="text-xs text-text-muted hover:text-text">
-          ← Back
-        </button>
-        <h1 className="text-lg font-medium mt-2 mb-4">Observability</h1>
-
-        <div className="border border-border rounded-lg overflow-hidden">
+      <div className="h-full flex flex-col min-h-0">
+        <header className="shrink-0 px-6 h-11 flex items-center gap-2 border-b border-border">
+          <button type="button" onClick={() => navigate(-1)} className="text-text-muted hover:text-text">
+            Back
+          </button>
+          <h1 className="font-medium">Observability</h1>
+        </header>
+        <div className="flex-1 min-h-0 overflow-y-auto p-6">
+        <div className="border border-border rounded-lg overflow-hidden max-w-[820px]">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-surface text-xs text-text-muted">
@@ -66,6 +68,7 @@ export default function ObservabilityPage() {
               )}
             </tbody>
           </table>
+        </div>
         </div>
       </div>
     </AppShell>

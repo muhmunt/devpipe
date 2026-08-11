@@ -31,6 +31,48 @@ pub fn validate_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Creates a new git repository at `dest` with one empty initial commit.
+///
+/// The initial commit is not optional: a repository with no HEAD cannot have
+/// worktrees, so skipping it would produce a project that breaks the moment
+/// the user adds one.
+pub async fn init(dest: &Path, default_branch: &str) -> Result<()> {
+    validate_path(dest)?;
+    validate_branch_name(default_branch)?;
+    if dest.exists() {
+        return Err(DomainError::Conflict(format!("destination already exists: {}", dest.display())));
+    }
+    tokio::fs::create_dir_all(dest).await.map_err(DomainError::Io)?;
+
+    let dest_str = dest.to_str().ok_or_else(|| DomainError::Invalid("non-utf8 path".into()))?;
+    let out = Command::new("git")
+        .args(["init", "-b", default_branch, dest_str])
+        .output()
+        .await
+        .map_err(DomainError::Io)?;
+    if !out.status.success() {
+        return Err(DomainError::Invalid(format!(
+            "git init failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )));
+    }
+
+    run_git(dest, &["commit", "--allow-empty", "-m", "Initial commit"]).await?;
+    Ok(())
+}
+
+/// Local branch names, for the "branch from" picker. Sorted with the most
+/// recently used first so the branch you were last on is near the top.
+pub async fn list_branches(repo_path: &Path) -> Result<Vec<String>> {
+    validate_path(repo_path)?;
+    let out = run_git(
+        repo_path,
+        &["for-each-ref", "--format=%(refname:short)", "--sort=-committerdate", "refs/heads"],
+    )
+    .await?;
+    Ok(out.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string).collect())
+}
+
 /// `git clone <url> <dest>`. No leading-dash / no shell string — same argv
 /// safety pattern as everything else in this module. Runs without `-C`
 /// since the destination doesn't exist yet.
