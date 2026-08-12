@@ -197,6 +197,7 @@ fn event_type_tag(event: &AgentEvent) -> &'static str {
     match event {
         AgentEvent::SessionStarted { .. } => "session_started",
         AgentEvent::MessageDelta { .. } => "message_delta",
+        AgentEvent::Thinking { .. } => "thinking",
         AgentEvent::ToolStarted { .. } => "tool_started",
         AgentEvent::ToolOutput { .. } => "tool_output",
         AgentEvent::FileChanged { .. } => "file_changed",
@@ -284,6 +285,22 @@ struct SinceParams {
     since: Option<DateTime<Utc>>,
 }
 
+/// Adds an `at` field to an event's JSON. Kept out of `AgentEvent` itself:
+/// the same event is broadcast to several subscribers and replayed from the
+/// log, and the time that matters is when it was recorded, not when the
+/// struct was built.
+fn stamp(payload: &mut serde_json::Value, at: DateTime<Utc>) {
+    if let Some(obj) = payload.as_object_mut() {
+        obj.insert("at".to_string(), serde_json::json!(at));
+    }
+}
+
+fn stamped(event: &AgentEvent, at: DateTime<Utc>) -> serde_json::Value {
+    let mut payload = serde_json::to_value(event).unwrap_or(serde_json::json!({}));
+    stamp(&mut payload, at);
+    payload
+}
+
 /// SSE stream: replays persisted history (optionally from `?since=`), then
 /// tails live events. MessageDelta events are batched into ~75ms windows
 /// (phase-r9.5) so a verbose session doesn't send one SSE frame per line;
@@ -301,7 +318,7 @@ async fn stream_events(
 
     let stream = async_stream::stream! {
         let replay_rows = sqlx::query(
-            "SELECT event_type, payload FROM session_events
+            "SELECT event_type, payload, created_at FROM session_events
              WHERE session_id = $1 AND ($2::timestamptz IS NULL OR created_at > $2)
              ORDER BY created_at",
         )
@@ -313,23 +330,29 @@ async fn stream_events(
 
         for row in replay_rows {
             let event_type: String = row.get("event_type");
-            let payload: serde_json::Value = row.get("payload");
+            let mut payload: serde_json::Value = row.get("payload");
+            // Replayed history carries the time it actually happened; a live
+            // event is stamped as it goes out. Without this the transcript
+            // could only ever show "now", which is wrong for every message
+            // that arrived before the tab was opened.
+            stamp(&mut payload, row.get("created_at"));
             yield Ok(Event::default().event(event_type).json_data(payload).unwrap_or_else(|_| Event::default()));
         }
 
-        let mut buffer: Vec<AgentEvent> = Vec::new();
+        let mut buffer: Vec<serde_json::Value> = Vec::new();
         let mut interval = tokio::time::interval(Duration::from_millis(75));
         loop {
             tokio::select! {
                 msg = live_rx.recv() => {
                     match msg {
-                        Ok(event @ AgentEvent::MessageDelta { .. }) => buffer.push(event),
+                        Ok(event @ AgentEvent::MessageDelta { .. }) => buffer.push(stamped(&event, Utc::now())),
                         Ok(other) => {
                             if !buffer.is_empty() {
                                 yield Ok(Event::default().event("message_delta_batch").json_data(&buffer).unwrap_or_else(|_| Event::default()));
                                 buffer.clear();
                             }
-                            yield Ok(Event::default().event(event_type_tag(&other)).json_data(&other).unwrap_or_else(|_| Event::default()));
+                            let payload = stamped(&other, Utc::now());
+                            yield Ok(Event::default().event(event_type_tag(&other)).json_data(&payload).unwrap_or_else(|_| Event::default()));
                         }
                         Err(broadcast::error::RecvError::Lagged(_)) => continue,
                         Err(broadcast::error::RecvError::Closed) => break,

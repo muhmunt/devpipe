@@ -42,6 +42,18 @@
   --color-error: #ef7c78;       /* deletions; 4.96:1 on surface-hover */
   --color-warning: #d9a441;
 
+  /* Syntax tokens. Every one measured against surface-elevated, the panel
+     code always sits on; the weakest here is 5.33:1. Hue does the
+     distinguishing, not brightness, so the block still reads as one block. */
+  --code-keyword: #c792ea;
+  --code-string: #8fce8f;
+  --code-number: #f2b880;
+  --code-comment: #9a9aa2;
+  --code-function: #82b1ff;
+  --code-type: #7fd1c8;
+  --code-attr: #e6c07b;
+  --code-meta: #a1a1a8;
+
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 10px;
@@ -65,6 +77,16 @@
   --color-success: #26682b;
   --color-error: #c0392b;
   --color-warning: #7d5200;
+
+  /* Same roles, re-measured against white; weakest is 5.05:1. */
+  --code-keyword: #8250df;
+  --code-string: #0a7b3e;
+  --code-number: #9a4a00;
+  --code-comment: #5f5f68;
+  --code-function: #0550ae;
+  --code-type: #0f6e6e;
+  --code-attr: #7a4d00;
+  --code-meta: #5c5c66;
 }
 
 html, body, #root {
@@ -182,6 +204,24 @@ body {
   overflow-x: auto;
 }
 .md pre code { background: none; border: 0; padding: 0; font-size: 0.85rem; }
+/* Fenced blocks are wrapped in .md-code by the renderer, which already
+   supplies the border and background — the inner <pre> must not draw a
+   second one inside it. */
+.md .md-code { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-elevated); }
+.md .md-code pre { border: 0; border-radius: 0; background: none; margin: 0; }
+.md .md-code .copy-btn {
+  position: absolute;
+  right: 0.375rem;
+  top: 0.375rem;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-elevated);
+  padding: 0.2rem 0.35rem;
+  color: var(--color-text-muted);
+}
+.md .md-code .copy-btn:hover { color: var(--color-text); background: var(--color-surface-hover); }
 .md table { width: 100%; border-collapse: collapse; font-size: 0.92em; }
 .md th, .md td {
   border: 1px solid var(--color-border);
@@ -194,6 +234,45 @@ body {
   border-left: 2px solid var(--color-border-strong);
   padding-left: 0.75rem;
   color: var(--color-text-muted);
+}
+
+/* highlight.js token classes mapped onto the design tokens above, so code
+   colours follow the theme instead of shipping a second, unrelated palette
+   that only looks right in the dark. Unmapped token classes simply inherit
+   the block's text colour. */
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-doctag { color: var(--code-keyword); }
+.hljs-string, .hljs-regexp, .hljs-addition, .hljs-template-tag { color: var(--code-string); }
+.hljs-number, .hljs-symbol, .hljs-bullet, .hljs-quote { color: var(--code-number); }
+.hljs-comment { color: var(--code-comment); font-style: italic; }
+.hljs-title, .hljs-title.function_, .hljs-name { color: var(--code-function); }
+.hljs-type, .hljs-title.class_, .hljs-built_in, .hljs-class { color: var(--code-type); }
+.hljs-attr, .hljs-attribute, .hljs-property, .hljs-variable, .hljs-template-variable { color: var(--code-attr); }
+.hljs-meta, .hljs-punctuation, .hljs-operator { color: var(--code-meta); }
+.hljs-deletion { color: var(--color-error); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+
+/* A code surface with a hovering copy button. The button only appears on
+   hover or keyboard focus so a wall of code isn't peppered with controls,
+   but it is always reachable by tab. */
+.code-surface { position: relative; }
+.code-surface .copy-btn { opacity: 0; transition: opacity 120ms var(--ease-out); }
+.code-surface:hover .copy-btn,
+.code-surface:focus-within .copy-btn { opacity: 1; }
+@media (hover: none) {
+  /* No hover on touch: showing it always beats hiding it forever. */
+  .code-surface .copy-btn { opacity: 1; }
+}
+
+/* Line numbers for the file viewer. A separate non-selectable column, so
+   copying the file doesn't drag the numbers along with it. */
+.code-lines { display: grid; grid-template-columns: auto 1fr; }
+.code-lines .ln {
+  user-select: none;
+  text-align: right;
+  padding-right: 0.75rem;
+  color: var(--color-text-faint);
+  border-right: 1px solid var(--color-border);
 }
 
 @media (prefers-reduced-motion: reduce) {

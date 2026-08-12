@@ -206,11 +206,72 @@ pub async fn status(worktree_path: &Path, target_branch: &str) -> Result<Worktre
     Ok(WorktreeStatus::Clean)
 }
 
+/// Which changes to look at. "Everything that differs from the target
+/// branch" is one question; "what have I not committed yet" is another, and
+/// a review surface needs to tell them apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffScope {
+    /// Committed on this branch but not on the target — `target...HEAD`.
+    Committed,
+    /// Written but not committed — working tree and index against HEAD.
+    Uncommitted,
+    /// Both at once: what the branch would contribute if committed now.
+    All,
+}
+
+impl DiffScope {
+    pub fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "committed" => Ok(DiffScope::Committed),
+            "uncommitted" => Ok(DiffScope::Uncommitted),
+            "all" => Ok(DiffScope::All),
+            other => Err(DomainError::Invalid(format!("unknown diff scope: {other}"))),
+        }
+    }
+}
+
+/// Switches the worktree to an existing branch. Git refuses when the branch
+/// is checked out in another worktree, or when uncommitted changes would be
+/// overwritten — both are real answers a person needs to see, so the error
+/// text is passed straight through rather than reinterpreted here.
+pub async fn checkout(worktree_path: &Path, branch: &str) -> Result<()> {
+    validate_path(worktree_path)?;
+    validate_branch_name(branch)?;
+    run_git(worktree_path, &["checkout", branch]).await?;
+    Ok(())
+}
+
+/// The branch currently checked out in this worktree, which is the truth the
+/// database row is only a cache of.
+pub async fn current_branch(worktree_path: &Path) -> Result<String> {
+    validate_path(worktree_path)?;
+    Ok(run_git(worktree_path, &["rev-parse", "--abbrev-ref", "HEAD"]).await?.trim().to_string())
+}
+
 pub async fn diff(worktree_path: &Path, target_branch: &str) -> Result<Diff> {
+    diff_scoped(worktree_path, target_branch, DiffScope::All).await
+}
+
+pub async fn diff_scoped(worktree_path: &Path, target_branch: &str, scope: DiffScope) -> Result<Diff> {
     validate_path(worktree_path)?;
     validate_branch_name(target_branch)?;
 
-    let range = format!("{target_branch}...HEAD");
+    // Every scope is measured from the merge base, never from the target
+    // branch's current tip: commits that landed on the target after this
+    // branch was cut are not this branch's business, and a two-dot `diff
+    // target` would show them backwards, as deletions this branch never
+    // made. `target...HEAD` says that for committed work; for anything
+    // involving the working tree, the merge base has to be resolved
+    // explicitly because `...` isn't allowed against uncommitted files.
+    let range = match scope {
+        DiffScope::Committed => format!("{target_branch}...HEAD"),
+        DiffScope::Uncommitted => "HEAD".to_string(),
+        DiffScope::All => run_git(worktree_path, &["merge-base", target_branch, "HEAD"])
+            .await
+            .map(|base| base.trim().to_string())
+            .unwrap_or_else(|_| "HEAD".to_string()),
+    };
+
     let name_status = run_git(worktree_path, &["diff", "--name-status", &range]).await?;
     let numstat = run_git(worktree_path, &["diff", "--numstat", &range]).await?;
     let full_diff = run_git(worktree_path, &["diff", &range]).await?;

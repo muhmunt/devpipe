@@ -82,7 +82,12 @@ export const api = {
     request<Worktree>(`/repositories/${repositoryId}/worktrees`, { method: 'POST', body: JSON.stringify(body) }),
   getWorktree: (id: string) => request<Worktree>(`/worktrees/${id}`),
   deleteWorktree: (id: string) => request<void>(`/worktrees/${id}`, { method: 'DELETE' }),
-  diffWorktree: (id: string) => request<Diff>(`/worktrees/${id}/diff`),
+  checkoutWorktree: (id: string, branch: string) =>
+    request<Worktree>(`/worktrees/${id}/checkout`, { method: 'POST', body: JSON.stringify({ branch }) }),
+  /** `all` (default) is everything this branch would contribute; the other
+      two split that into what's committed and what isn't. */
+  diffWorktree: (id: string, scope?: 'all' | 'committed' | 'uncommitted') =>
+    request<Diff>(`/worktrees/${id}/diff${scope ? `?scope=${scope}` : ''}`),
   listCommits: (id: string) => request<Commit[]>(`/worktrees/${id}/commits`),
   commitWorktree: (id: string, message: string) =>
     request<Worktree>(`/worktrees/${id}/commit`, { method: 'POST', body: JSON.stringify({ message }) }),

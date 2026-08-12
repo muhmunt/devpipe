@@ -229,6 +229,11 @@ pub struct Command {
 pub enum AgentEvent {
     SessionStarted { session_id: Uuid },
     MessageDelta { session_id: Uuid, role: String, text: String },
+    /// The model has started reasoning. Claude's thinking blocks are
+    /// encrypted, so there is no text to show — only the fact that it is
+    /// happening, which is the difference between a considered pause and a
+    /// hang.
+    Thinking { session_id: Uuid },
     /// `call_id` is the agent's own id for this tool call (Claude's
     /// `toolu_...`), carried so the UI can fold a start and its later result
     /// into one row instead of showing the same call twice.

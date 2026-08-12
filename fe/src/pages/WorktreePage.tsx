@@ -7,6 +7,7 @@ import { Composer } from '@/components/Composer'
 import { FilesPanel } from '@/components/FilesPanel'
 import { FileView } from '@/components/FileView'
 import { RightPanel } from '@/components/RightPanel'
+import { SessionHistory } from '@/components/SessionHistory'
 import { SessionTabs, type MainView } from '@/components/SessionTabs'
 import { SkeletonRows } from '@/components/Skeleton'
 import { StatusBar } from '@/components/StatusBar'
@@ -27,6 +28,7 @@ const SSE_EVENT_NAMES = [
   'session_started',
   'message_delta',
   'message_delta_batch',
+  'thinking',
   'tool_started',
   'tool_output',
   'file_changed',
@@ -74,6 +76,19 @@ export default function WorktreePage() {
     setEntries((prev) => {
       const next = [...prev]
       for (const ev of events) {
+        // "Thinking…" is a state, not a record: it stands until the agent
+        // produces something, then it's replaced by what it produced. Left
+        // in place it would litter the history with one line per reasoning
+        // block, which is noise nobody can act on.
+        if ((ev.type === 'message_delta' || ev.type === 'tool_started') && next[next.length - 1]?.type === 'thinking') {
+          next.pop()
+        }
+
+        if (ev.type === 'thinking') {
+          if (next[next.length - 1]?.type !== 'thinking') next.push({ type: 'thinking', at: ev.at })
+          continue
+        }
+
         if (ev.type === 'message_delta') {
           // Deltas are exact substrings of the final text (Claude streams
           // token-by-token, embedded newlines and all) — concatenate
@@ -85,7 +100,7 @@ export default function WorktreePage() {
           }
           next.push({ type: 'message', role: ev.role, text: ev.text })
         } else if (ev.type === 'tool_started') {
-          next.push({ type: 'tool', callId: ev.call_id, tool: ev.tool, input: ev.input })
+          next.push({ type: 'tool', callId: ev.call_id, tool: ev.tool, input: ev.input, at: ev.at })
         } else if (ev.type === 'tool_output') {
           // A tool's result arrives long after it was announced. Folding the
           // two into one row by the agent's own call id is what makes a run
@@ -344,7 +359,14 @@ export default function WorktreePage() {
   return (
     <AppShell
       rightPanel={
-        <RightPanel worktreeId={worktree.id} repository={repository} onRepositoryChange={setRepository} onOpenFile={openFile} />
+        <RightPanel
+          worktreeId={worktree.id}
+          worktree={worktree}
+          repository={repository}
+          onWorktreeChange={setWorktree}
+          onRepositoryChange={setRepository}
+          onOpenFile={openFile}
+        />
       }
       statusBar={<StatusBar worktree={worktree} onChange={setWorktree} />}
     >
@@ -392,17 +414,24 @@ export default function WorktreePage() {
                 {loadingTimeline && <SkeletonRows rows={5} />}
 
                 {!loadingTimeline && entries.length === 0 && (
-                  <div className="text-center py-16">
+                  <div>
                     {view.kind === 'new' ? (
                       <>
-                        <p className="text-text-muted">Start a chat on this branch</p>
-                        <p className="text-text-faint text-[12px] mt-1">
-                          {agentName} works in <span className="font-mono">{worktree.branch}</span> only — nothing it does
-                          here touches your other branches.
-                        </p>
+                        <div className="text-center py-12">
+                          <p className="text-text-muted">Start a chat on this branch</p>
+                          <p className="text-text-faint text-[12px] mt-1">
+                            {agentName} works in <span className="font-mono">{worktree.branch}</span> only — nothing it
+                            does here touches your other branches.
+                          </p>
+                        </div>
+                        <SessionHistory
+                          sessions={sessions}
+                          catalog={catalog}
+                          onOpen={(id) => reopenSession(id)}
+                        />
                       </>
                     ) : (
-                      <p className="text-text-faint">Nothing was said in this chat.</p>
+                      <p className="text-text-faint text-center py-16">Nothing was said in this chat.</p>
                     )}
                   </div>
                 )}

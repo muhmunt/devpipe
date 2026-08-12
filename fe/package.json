@@ -18,6 +18,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "dompurify": "^3.4.12",
+    "highlight.js": "^11.11.2",
     "lucide-react": "^1.25.0",
     "marked": "^18.0.6",
     "mermaid": "^11.16.0",

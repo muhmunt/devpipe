@@ -160,6 +160,9 @@ impl ClaudeParser {
         match event.get("type").and_then(|v| v.as_str()) {
             Some("content_block_start") => {
                 let block = event.get("content_block");
+                if block.and_then(|b| b.get("type")).and_then(|v| v.as_str()) == Some("thinking") {
+                    return vec![AgentEvent::Thinking { session_id }];
+                }
                 if block.and_then(|b| b.get("type")).and_then(|v| v.as_str()) == Some("tool_use") {
                     let call_id = block.and_then(|b| b.get("id")).and_then(|v| v.as_str()).unwrap_or_default();
                     let name = block.and_then(|b| b.get("name")).and_then(|v| v.as_str()).unwrap_or("tool");
@@ -566,12 +569,16 @@ mod tests {
 
         let noise = [
             r#"{"type":"system","subtype":"init","cwd":"/tmp"}"#,
-            r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}}"#,
             r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""}}}"#,
         ];
         for line in noise {
             assert!(parser.parse(session_id, line).is_empty(), "lifecycle noise must not reach the transcript");
         }
+
+        // A thinking block opening is the one piece of reasoning that is
+        // observable — its contents are encrypted, its existence is not.
+        let thinking = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}}}"#;
+        assert!(matches!(parser.parse(session_id, thinking).as_slice(), [AgentEvent::Thinking { .. }]));
         // A thinking block closing must not invent a tool row.
         assert!(parser.parse(session_id, r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#).is_empty());
 

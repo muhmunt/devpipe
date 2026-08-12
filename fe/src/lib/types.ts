@@ -110,9 +110,12 @@ export type Diff = {
 // enum's variant tag (the "type" value); it doesn't rename inner fields,
 // so serde emits them as written in Rust (session_id, exit_code, ...).
 // Verified against real captured SSE output during Rung 5 testing.
-export type AgentEvent =
+// `at` is added by the events endpoint, not by the Rust enum: replayed rows
+// carry the time they were recorded, live ones the time they were sent.
+export type AgentEvent = { at?: string } & (
   | { type: 'session_started'; session_id: string }
   | { type: 'message_delta'; session_id: string; role: string; text: string }
+  | { type: 'thinking'; session_id: string }
   | { type: 'tool_started'; session_id: string; call_id: string; tool: string; input: unknown }
   | { type: 'tool_output'; session_id: string; call_id: string; tool: string; output: string; is_error: boolean }
   | { type: 'file_changed'; session_id: string; path: string }
@@ -121,6 +124,7 @@ export type AgentEvent =
   | { type: 'session_idle'; session_id: string }
   | { type: 'session_completed'; session_id: string; exit_code: number }
   | { type: 'session_error'; session_id: string; message: string }
+)
 
 /** What one agent can be asked to do, measured on this machine. */
 export type AgentCatalogEntry = {
@@ -145,10 +149,13 @@ export type ToolEntry = {
   input?: unknown
   output?: string
   isError?: boolean
+  /** When the call started, from the event stream. */
+  at?: string
 }
 
 export type TimelineEntry =
   | { type: 'message'; role: string; text: string }
+  | { type: 'thinking'; at?: string }
   | ToolEntry
   | ({ type: string } & Record<string, unknown>)
 

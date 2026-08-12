@@ -22,6 +22,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/repositories/:id/worktrees", get(list_worktrees).post(create_worktree))
         .route("/worktrees/:id", get(get_worktree).patch(update_worktree).delete(delete_worktree))
         .route("/worktrees/:id/diff", get(diff_worktree))
+        .route("/worktrees/:id/checkout", post(checkout_worktree))
         .route("/worktrees/:id/commit", post(commit_worktree))
         .route("/worktrees/:id/push", post(push_worktree))
         .route("/worktrees/:id/files", get(list_files))
@@ -649,14 +650,56 @@ async fn get_worktree(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Resul
     Ok(Json(refresh_worktree_status(&pool, &worktree).await?))
 }
 
+#[derive(Deserialize)]
+struct DiffParams {
+    /// `committed` | `uncommitted` | `all`. Defaults to everything the
+    /// branch would contribute, which is what a bare "show me the changes"
+    /// means.
+    scope: Option<String>,
+}
+
 async fn diff_worktree(
     State(pool): State<PgPool>,
     Path(id): Path<Uuid>,
+    Query(params): Query<DiffParams>,
 ) -> Result<Json<crate::domain::Diff>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
     let target_branch = worktree.target_branch.unwrap_or_else(|| "main".to_string());
-    let diff = crate::git::diff(std::path::Path::new(&worktree.path), &target_branch).await?;
+    let scope = match params.scope.as_deref() {
+        Some(s) => crate::git::DiffScope::from_str(s)?,
+        None => crate::git::DiffScope::All,
+    };
+    let diff = crate::git::diff_scoped(std::path::Path::new(&worktree.path), &target_branch, scope).await?;
     Ok(Json(diff))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CheckoutBody {
+    branch: String,
+}
+
+/// Switches which branch this worktree has checked out. The database row
+/// only caches the branch name, so it's re-read from git afterwards rather
+/// than assumed — a checkout that git silently resolved differently (a
+/// detached HEAD, say) would otherwise leave the UI lying.
+async fn checkout_worktree(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<CheckoutBody>,
+) -> Result<Json<Worktree>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    let path = std::path::Path::new(&worktree.path);
+    crate::git::checkout(path, &body.branch).await?;
+    let actual = crate::git::current_branch(path).await?;
+
+    let row = sqlx::query("UPDATE worktrees SET branch = $2, updated_at = now() WHERE id = $1 RETURNING *")
+        .bind(id)
+        .bind(&actual)
+        .fetch_one(&pool)
+        .await?;
+    let updated = worktree_from_row(&row)?;
+    Ok(Json(refresh_worktree_status(&pool, &updated).await?))
 }
 
 /// Recomputes and persists a worktree's status, matching get_worktree's
