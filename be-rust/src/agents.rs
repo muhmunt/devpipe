@@ -405,6 +405,36 @@ pub struct ClaudeAdapter {
     pub pm: Arc<ProcessManager>,
 }
 
+impl ClaudeAdapter {
+    /// Everything except the conversation-id flag and the prompt — shared by
+    /// the first turn, follow-up turns and a resume after restart, so all
+    /// three run the model with the same settings. Values the CLI doesn't
+    /// document are dropped rather than passed through, so a stale client
+    /// can't make it reject the whole invocation.
+    fn base_args(&self, cfg: &StartConfig) -> Vec<String> {
+        let mut args = vec![
+            "-p".to_string(),
+            "--output-format".to_string(),
+            "stream-json".to_string(),
+            "--verbose".to_string(),
+            "--include-partial-messages".to_string(),
+        ];
+        if let Some(model) = &cfg.model {
+            args.push("--model".to_string());
+            args.push(model.clone());
+        }
+        if let Some(effort) = cfg.reasoning_level.as_deref().filter(|l| CLAUDE_EFFORTS.contains(l)) {
+            args.push("--effort".to_string());
+            args.push(effort.to_string());
+        }
+        if let Some(mode) = cfg.permission_mode.as_deref().filter(|m| CLAUDE_PERMISSION_MODES.contains(m)) {
+            args.push("--permission-mode".to_string());
+            args.push(mode.to_string());
+        }
+        args
+    }
+}
+
 #[async_trait]
 impl AgentAdapter for ClaudeAdapter {
     fn id(&self) -> &str {
@@ -414,44 +444,41 @@ impl AgentAdapter for ClaudeAdapter {
         Ok(detect_executable("claude").await)
     }
     async fn start(&self, cfg: StartConfig) -> Result<Box<dyn SessionHandle>> {
-        let effort = cfg.reasoning_level.as_deref().filter(|level| CLAUDE_EFFORTS.contains(level));
-        let permission = cfg.permission_mode.as_deref().filter(|mode| CLAUDE_PERMISSION_MODES.contains(mode));
-        let base = |flag_name: &str, flag_value: String| {
-            let mut a = vec![
-                "-p".to_string(),
-                "--output-format".to_string(),
-                "stream-json".to_string(),
-                "--verbose".to_string(),
-                "--include-partial-messages".to_string(),
-            ];
-            if let Some(model) = &cfg.model {
-                a.push("--model".to_string());
-                a.push(model.clone());
-            }
-            // `--effort <low|medium|high|xhigh|max>`, verified against
-            // `claude --help`. An unrecognised value is dropped rather than
-            // passed through, so a stale client can't make the CLI reject
-            // the whole invocation.
-            if let Some(effort) = effort {
-                a.push("--effort".to_string());
-                a.push(effort.to_string());
-            }
-            if let Some(permission) = permission {
-                a.push("--permission-mode".to_string());
-                a.push(permission.to_string());
-            }
-            a.push(flag_name.to_string());
-            a.push(flag_value);
-            a
-        };
-
         // `--session-id` lets us pick the id ourselves, so `--resume` on
         // every later turn doesn't need to scrape an id out of the CLI's
         // own output (verified against `claude --help`: both flags exist).
-        let mut args = base("--session-id", cfg.session_id.to_string());
+        let mut args = self.base_args(&cfg);
+        args.push("--session-id".to_string());
+        args.push(cfg.session_id.to_string());
         args.push(cfg.prompt.clone());
 
-        let resume_args = base("--resume", cfg.session_id.to_string());
+        let mut resume_args = self.base_args(&cfg);
+        resume_args.push("--resume".to_string());
+        resume_args.push(cfg.session_id.to_string());
+        let resume = Resume {
+            program: "claude".to_string(),
+            args: resume_args,
+            cwd: cfg.worktree_path.clone(),
+            make_parser: make_claude_parser,
+        };
+
+        spawn_and_stream(self.pm.clone(), cfg.session_id, "claude", args, cfg.worktree_path, Some(resume), make_claude_parser)
+            .await
+    }
+
+    /// Same invocation as a follow-up turn, but building a fresh handle:
+    /// `--resume <session id>` reattaches to the transcript Claude stored
+    /// under the id we supplied at `start`, so a conversation outlives the
+    /// process that began it.
+    async fn resume(&self, cfg: StartConfig) -> Result<Box<dyn SessionHandle>> {
+        let mut args = self.base_args(&cfg);
+        args.push("--resume".to_string());
+        args.push(cfg.session_id.to_string());
+        args.push(cfg.prompt.clone());
+
+        let mut resume_args = self.base_args(&cfg);
+        resume_args.push("--resume".to_string());
+        resume_args.push(cfg.session_id.to_string());
         let resume = Resume {
             program: "claude".to_string(),
             args: resume_args,

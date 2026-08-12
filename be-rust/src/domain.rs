@@ -132,6 +132,10 @@ pub struct Worktree {
     pub deletions: Option<u32>,
     pub pinned_at: Option<DateTime<Utc>>,
     pub favorite: bool,
+    /// The directory this row names no longer exists. Computed on read, not
+    /// stored: it can become true at any moment without devpipe involved.
+    #[serde(default)]
+    pub missing: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,6 +170,7 @@ pub struct AgentSession {
     pub agent_definition_id: String,
     pub model: Option<String>,
     pub reasoning_level: Option<String>,
+    pub permission_mode: Option<String>,
     pub status: SessionStatus,
     pub process_id: Option<i32>,
     pub started_at: Option<DateTime<Utc>>,
@@ -316,4 +321,18 @@ pub trait AgentAdapter: Send + Sync {
     fn id(&self) -> &str;
     async fn detect(&self) -> Result<bool>;
     async fn start(&self, cfg: StartConfig) -> Result<Box<dyn SessionHandle>>;
+
+    /// Picks a conversation back up when this process no longer holds a
+    /// handle for it — after a server restart, most of all. The agent's own
+    /// CLI keeps the transcript keyed by the session id we chose, so the
+    /// conversation itself survives even though our in-memory handle didn't.
+    ///
+    /// Default: not supported. An adapter that can't set or recover a
+    /// conversation id must say so rather than silently starting a fresh,
+    /// context-free chat that looks like a continuation.
+    async fn resume(&self, _cfg: StartConfig) -> Result<Box<dyn SessionHandle>> {
+        Err(DomainError::Invalid(
+            "this agent can't pick a conversation back up after a restart — start a new chat".into(),
+        ))
+    }
 }

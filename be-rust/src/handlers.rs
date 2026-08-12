@@ -23,6 +23,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/worktrees/:id", get(get_worktree).patch(update_worktree).delete(delete_worktree))
         .route("/worktrees/:id/diff", get(diff_worktree))
         .route("/worktrees/:id/checkout", post(checkout_worktree))
+        .route("/worktrees/:id/restore", post(restore_worktree))
         .route("/worktrees/:id/commit", post(commit_worktree))
         .route("/worktrees/:id/push", post(push_worktree))
         .route("/worktrees/:id/files", get(list_files))
@@ -67,13 +68,28 @@ pub(crate) fn repository_from_row(row: &sqlx::postgres::PgRow) -> Repository {
     }
 }
 
+/// A worktree row can outlive the directory it names — `git worktree
+/// remove`, a stray `rm -rf`, a repository moved on disk. Everything that
+/// touches the checkout has to say that plainly; without this the app
+/// reports "No such file or directory (os error 2)", which names neither the
+/// worktree nor what to do about it.
+pub(crate) fn ensure_worktree_on_disk(worktree: &Worktree) -> Result<(), AppError> {
+    if std::path::Path::new(&worktree.path).is_dir() {
+        return Ok(());
+    }
+    Err(AppError::Invalid(format!(
+        "the folder for '{}' is missing ({}). It was removed outside devpipe — restore it to keep using this worktree, or delete it from the sidebar.",
+        worktree.branch, worktree.path
+    )))
+}
+
 pub(crate) fn worktree_from_row(row: &sqlx::postgres::PgRow) -> Result<Worktree, AppError> {
     let kind: String = row.get("kind");
     let status: String = row.get("status");
+    let path: String = row.get("path");
     Ok(Worktree {
         id: row.get("id"),
         repository_id: row.get("repository_id"),
-        path: row.get("path"),
         branch: row.get("branch"),
         target_branch: row.get("target_branch"),
         kind: WorktreeKind::from_str(&kind)?,
@@ -85,6 +101,8 @@ pub(crate) fn worktree_from_row(row: &sqlx::postgres::PgRow) -> Result<Worktree,
         deletions: None,
         pinned_at: row.get("pinned_at"),
         favorite: row.get("favorite"),
+        missing: !std::path::Path::new(&path).is_dir(),
+        path,
     })
 }
 
@@ -665,6 +683,7 @@ async fn diff_worktree(
     Query(params): Query<DiffParams>,
 ) -> Result<Json<crate::domain::Diff>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
+    ensure_worktree_on_disk(&worktree)?;
     let target_branch = worktree.target_branch.unwrap_or_else(|| "main".to_string());
     let scope = match params.scope.as_deref() {
         Some(s) => crate::git::DiffScope::from_str(s)?,
@@ -672,6 +691,30 @@ async fn diff_worktree(
     };
     let diff = crate::git::diff_scoped(std::path::Path::new(&worktree.path), &target_branch, scope).await?;
     Ok(Json(diff))
+}
+
+/// Re-creates the checkout for a worktree whose directory went missing. The
+/// branch still exists in the repository, so this is `git worktree add`
+/// against it again — no work is lost that wasn't already lost with the
+/// directory, and committed work was never in the directory to begin with.
+async fn restore_worktree(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Json<Worktree>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    if !worktree.missing {
+        return Err(AppError::Invalid("this worktree's folder is already there".into()));
+    }
+    let repo = fetch_repository(&pool, worktree.repository_id).await?;
+    let target = worktree.target_branch.clone().unwrap_or_else(|| repo.default_branch.clone());
+
+    crate::git::worktree_add(
+        std::path::Path::new(&repo.local_path),
+        std::path::Path::new(&worktree.path),
+        &worktree.branch,
+        &target,
+    )
+    .await?;
+
+    let refreshed = fetch_worktree(&pool, id).await?;
+    Ok(Json(refresh_worktree_status(&pool, &refreshed).await?))
 }
 
 #[derive(Deserialize)]
@@ -690,6 +733,7 @@ async fn checkout_worktree(
     Json(body): Json<CheckoutBody>,
 ) -> Result<Json<Worktree>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
+    ensure_worktree_on_disk(&worktree)?;
     let path = std::path::Path::new(&worktree.path);
     crate::git::checkout(path, &body.branch).await?;
     let actual = crate::git::current_branch(path).await?;
@@ -706,6 +750,13 @@ async fn checkout_worktree(
 /// Recomputes and persists a worktree's status, matching get_worktree's
 /// write-through pattern — used after any git operation that changes it.
 async fn refresh_worktree_status(pool: &PgPool, worktree: &Worktree) -> Result<Worktree, AppError> {
+    // A worktree whose folder is gone has no status to read — asking git
+    // would fail the whole request, which would make the worktree
+    // unreadable and so unfixable. Its last known status stands, and
+    // `missing` is what the UI acts on.
+    if worktree.missing {
+        return Ok(worktree.clone());
+    }
     let target_branch = worktree.target_branch.clone().unwrap_or_else(|| "main".to_string());
     let fresh_status = crate::git::status(std::path::Path::new(&worktree.path), &target_branch).await?;
     let row = sqlx::query("UPDATE worktrees SET status = $1, updated_at = $2 WHERE id = $3 RETURNING *")
@@ -728,18 +779,21 @@ async fn commit_worktree(
     Json(body): Json<CommitBody>,
 ) -> Result<Json<Worktree>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
+    ensure_worktree_on_disk(&worktree)?;
     crate::git::commit(std::path::Path::new(&worktree.path), &body.message).await?;
     Ok(Json(refresh_worktree_status(&pool, &worktree).await?))
 }
 
 async fn push_worktree(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Json<Worktree>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
+    ensure_worktree_on_disk(&worktree)?;
     crate::git::push(std::path::Path::new(&worktree.path), &worktree.branch).await?;
     Ok(Json(refresh_worktree_status(&pool, &worktree).await?))
 }
 
 async fn list_files(State(pool): State<PgPool>, Path(id): Path<Uuid>) -> Result<Json<Vec<String>>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
+    ensure_worktree_on_disk(&worktree)?;
     let files = crate::git::list_files(std::path::Path::new(&worktree.path)).await?;
     Ok(Json(files))
 }
@@ -765,6 +819,7 @@ async fn read_worktree_file(
     Query(params): Query<FileContentParams>,
 ) -> Result<Json<FileContentResponse>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
+    ensure_worktree_on_disk(&worktree)?;
     let content = crate::git::read_file(std::path::Path::new(&worktree.path), &params.path).await?;
     Ok(Json(FileContentResponse { path: params.path, content }))
 }
@@ -774,6 +829,7 @@ async fn list_commits(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<crate::domain::Commit>>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
+    ensure_worktree_on_disk(&worktree)?;
     let commits = crate::git::commits(std::path::Path::new(&worktree.path), 30).await?;
     Ok(Json(commits))
 }
@@ -789,6 +845,7 @@ async fn run_script(
     Json(body): Json<RunScriptBody>,
 ) -> Result<Json<crate::scripts::ScriptOutput>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
+    ensure_worktree_on_disk(&worktree)?;
     let repo = fetch_repository(&pool, worktree.repository_id).await?;
 
     let script_text = match body.script.as_str() {
@@ -824,6 +881,7 @@ async fn exec_command(
     Json(body): Json<ExecBody>,
 ) -> Result<Json<crate::scripts::ScriptOutput>, AppError> {
     let worktree = fetch_worktree(&pool, id).await?;
+    ensure_worktree_on_disk(&worktree)?;
     let output = crate::scripts::exec(std::path::Path::new(&worktree.path), &body.command, body.cwd.as_deref()).await?;
     Ok(Json(output))
 }

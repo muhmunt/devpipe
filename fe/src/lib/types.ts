@@ -45,6 +45,8 @@ export type Worktree = {
   deletions?: number
   pinnedAt: string | null
   favorite: boolean
+  /** The directory this row names is gone — removed outside devpipe. */
+  missing: boolean
 }
 
 export type DirEntryInfo = {
@@ -85,6 +87,7 @@ export type AgentSession = {
   agentDefinitionId: string
   model: string | null
   reasoningLevel: string | null
+  permissionMode: string | null
   status: SessionStatus
   processId: number | null
   startedAt: string | null

@@ -82,6 +82,8 @@ export const api = {
     request<Worktree>(`/repositories/${repositoryId}/worktrees`, { method: 'POST', body: JSON.stringify(body) }),
   getWorktree: (id: string) => request<Worktree>(`/worktrees/${id}`),
   deleteWorktree: (id: string) => request<void>(`/worktrees/${id}`, { method: 'DELETE' }),
+  /** Re-creates the checkout for a worktree whose folder went missing. */
+  restoreWorktree: (id: string) => request<Worktree>(`/worktrees/${id}/restore`, { method: 'POST' }),
   checkoutWorktree: (id: string, branch: string) =>
     request<Worktree>(`/worktrees/${id}/checkout`, { method: 'POST', body: JSON.stringify({ branch }) }),
   /** `all` (default) is everything this branch would contribute; the other

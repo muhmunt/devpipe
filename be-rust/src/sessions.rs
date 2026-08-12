@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::agents::{ClaudeAdapter, CursorAdapter, CustomCliAdapter};
 use crate::domain::{AgentAdapter, AgentEvent, AgentSession, SessionHandle, StartConfig};
 use crate::error::AppError;
-use crate::handlers::{agent_definition_from_row, fetch_repository, fetch_worktree};
+use crate::handlers::{agent_definition_from_row, ensure_worktree_on_disk, fetch_repository, fetch_worktree};
 use crate::state::AppState;
 
 pub type HandleRegistry = Arc<Mutex<HashMap<Uuid, Box<dyn SessionHandle>>>>;
@@ -40,6 +40,7 @@ fn session_from_row(row: &sqlx::postgres::PgRow) -> AgentSession {
         agent_definition_id: row.get("agent_definition_id"),
         model: row.get("model"),
         reasoning_level: row.get("reasoning_level"),
+        permission_mode: row.get("permission_mode"),
         status: parse_status(&status),
         process_id: row.get("process_id"),
         started_at: row.get("started_at"),
@@ -121,17 +122,18 @@ async fn create_session(
     Json(body): Json<CreateSessionBody>,
 ) -> Result<Json<AgentSession>, AppError> {
     let worktree = fetch_worktree(&state.pool, worktree_id).await?;
+    // Both checks run before the session row is written, so a chat that
+    // can't start doesn't leave a dead session behind.
+    ensure_worktree_on_disk(&worktree)?;
     let repo = fetch_repository(&state.pool, worktree.repository_id).await?;
-    // Validated before the session row is written, so a bad attachment can't
-    // leave a dead session behind.
     let prompt = compose_prompt(&body.prompt, &body.attachments)?;
 
     let id = Uuid::new_v4();
     let now = Utc::now();
     sqlx::query(
         "INSERT INTO agent_sessions
-         (id, workspace_id, worktree_id, agent_definition_id, model, reasoning_level, status, started_at, last_activity_at)
-         VALUES ($1, $2, $3, $4, $5, $6, 'starting', $7, $7)",
+         (id, workspace_id, worktree_id, agent_definition_id, model, reasoning_level, permission_mode, status, started_at, last_activity_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'starting', $8, $8)",
     )
     .bind(id)
     .bind(repo.workspace_id)
@@ -139,6 +141,7 @@ async fn create_session(
     .bind(&body.agent_definition_id)
     .bind(&body.model)
     .bind(&body.reasoning_level)
+    .bind(&body.permission_mode)
     .bind(now)
     .execute(&state.pool)
     .await?;
@@ -422,8 +425,23 @@ struct ReplyBody {
 /// fresh, context-free chat.
 async fn reply(State(state): State<AppState>, Path(id): Path<Uuid>, Json(body): Json<ReplyBody>) -> Result<(), AppError> {
     let input = compose_prompt(&body.input, &body.attachments)?;
-    let handles = state.handles.lock().await;
-    let handle = handles.get(&id).ok_or(AppError::NotFound)?;
+
+    // One turn at a time. A second reply arriving while the agent is still
+    // working would spawn a second process against the same conversation,
+    // and both would stream into the same transcript — the two answers
+    // interleave token by token into nonsense. The composer disables itself
+    // while a turn runs, but that's a courtesy; this is the guarantee.
+    let status: Option<String> = sqlx::query_scalar("SELECT status FROM agent_sessions WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?;
+    match status.as_deref() {
+        None => return Err(AppError::NotFound),
+        Some("running") | Some("starting") => {
+            return Err(AppError::Conflict("this chat is still working — wait for it to finish".into()))
+        }
+        _ => {}
+    }
 
     // Unlike create_session, a live SSE viewer is already connected here —
     // persisting alone (as at session creation) isn't enough, it also has
@@ -434,8 +452,60 @@ async fn reply(State(state): State<AppState>, Path(id): Path<Uuid>, Json(body): 
         let _ = bus_tx.send(user_event);
     }
 
-    handle.send(&input).await?;
-    sqlx::query("UPDATE agent_sessions SET status = 'running' WHERE id = $1").bind(id).execute(&state.pool).await?;
+    // The handle only lives in this process's memory. A restart wipes it,
+    // and answering "not found" then would be wrong twice over: the chat
+    // plainly exists, and the agent's CLI still has the whole conversation
+    // stored under the id we gave it. So a missing handle means reattach,
+    // not fail.
+    let existing = state.handles.lock().await.contains_key(&id);
+    if !existing {
+        resume_session(&state, id, &input).await?;
+    } else {
+        let handles = state.handles.lock().await;
+        let handle = handles.get(&id).ok_or(AppError::NotFound)?;
+        handle.send(&input).await?;
+    }
+
+    sqlx::query("UPDATE agent_sessions SET status = 'running', ended_at = NULL WHERE id = $1")
+        .bind(id)
+        .execute(&state.pool)
+        .await?;
+    Ok(())
+}
+
+/// Rebuilds a live handle for a conversation this process has no memory of,
+/// replaying the settings it was started with — including its permission
+/// mode, which is why that is persisted rather than held in memory.
+async fn resume_session(state: &AppState, id: Uuid, input: &str) -> Result<(), AppError> {
+    let row = sqlx::query("SELECT * FROM agent_sessions WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let session = session_from_row(&row);
+    let worktree_id = session.worktree_id.ok_or(AppError::NotFound)?;
+    let worktree = fetch_worktree(&state.pool, worktree_id).await?;
+    ensure_worktree_on_disk(&worktree)?;
+
+    let adapter = resolve_adapter(&state.pool, state.pm.clone(), &session.agent_definition_id).await?;
+    let handle = adapter
+        .resume(StartConfig {
+            session_id: id,
+            worktree_path: std::path::PathBuf::from(&worktree.path),
+            model: session.model.clone(),
+            reasoning_level: session.reasoning_level.clone(),
+            permission_mode: session.permission_mode.clone(),
+            prompt: input.to_string(),
+        })
+        .await?;
+
+    let bus_tx = {
+        let mut buses = state.buses.lock().await;
+        buses.entry(id).or_insert_with(|| broadcast::channel(1024).0).clone()
+    };
+    let rx = handle.events();
+    tokio::spawn(persist_and_broadcast(state.pool.clone(), id, bus_tx, rx));
+    state.handles.lock().await.insert(id, handle);
     Ok(())
 }
 

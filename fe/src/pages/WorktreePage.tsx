@@ -1,20 +1,28 @@
 /* devpipe · design-system: design.md */
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { FolderX, Loader2 } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { Composer } from '@/components/Composer'
 import { FilesPanel } from '@/components/FilesPanel'
 import { FileView } from '@/components/FileView'
+import { NewTabChooser } from '@/components/NewTabChooser'
 import { RightPanel } from '@/components/RightPanel'
 import { SessionHistory } from '@/components/SessionHistory'
-import { SessionTabs, type MainView } from '@/components/SessionTabs'
+import { SessionTabs } from '@/components/SessionTabs'
 import { SkeletonRows } from '@/components/Skeleton'
 import { StatusBar } from '@/components/StatusBar'
 import { TerminalPanel } from '@/components/TerminalPanel'
 import { Transcript } from '@/components/Transcript'
 import { api } from '@/lib/api'
 import { addTab } from '@/lib/tabs'
+import {
+  getTabState,
+  nextTabId,
+  setTabState,
+  subscribeTabs,
+  type WorktreeTab,
+} from '@/lib/worktreeTabs'
 import type {
   AgentCatalogEntry,
   AgentEvent,
@@ -44,16 +52,29 @@ const RUNNING = new Set(['starting', 'running'])
 
 export default function WorktreePage() {
   const { id } = useParams<{ id: string }>()
+  const worktreeId = id ?? ''
+
+  // Tabs live outside React so they survive leaving this worktree and coming
+  // back. Held in component state they were thrown away on every unmount,
+  // which is what made navigation feel like a page reload.
+  const tabState = useSyncExternalStore(
+    subscribeTabs,
+    useCallback(() => getTabState(worktreeId), [worktreeId]),
+  )
+  const { tabs, activeId } = tabState
+  const activeTab = tabs.find((t) => t.id === activeId) ?? null
+
   const [worktree, setWorktree] = useState<Worktree | null>(null)
   const [repository, setRepository] = useState<Repository | null>(null)
   const [sessions, setSessions] = useState<AgentSession[]>([])
-  const [view, setView] = useState<MainView>({ kind: 'new' })
-  const [openFiles, setOpenFiles] = useState<string[]>([])
-  const [closedSessionIds, setClosedSessionIds] = useState<Set<string>>(new Set())
   const [session, setSession] = useState<AgentSession | null>(null)
   const [entries, setEntries] = useState<TimelineEntry[]>([])
   const [loadingTimeline, setLoadingTimeline] = useState(false)
-  const [agentId, setAgentId] = useState('claude')
+  // Which agent an as-yet-unsent draft tab is aimed at, per tab, so two open
+  // drafts can be pointed at different agents.
+  const [draftAgents, setDraftAgents] = useState<Record<string, string>>({})
+  // Composer text per tab: switching tabs must not eat what you were typing.
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [model, setModel] = useState('')
   const [effort, setEffort] = useState('')
   // Claude's own default refuses every edit and command in a headless run,
@@ -63,15 +84,31 @@ export default function WorktreePage() {
   // up or down per chat.
   const [permissionMode, setPermissionMode] = useState('acceptEdits')
   const [attachments, setAttachments] = useState<string[]>([])
-  const [prompt, setPrompt] = useState('')
   const [catalog, setCatalog] = useState<AgentCatalogEntry[]>([])
   const [files, setFiles] = useState<string[]>([])
   const [composerError, setComposerError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [restoring, setRestoring] = useState(false)
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const esRef = useRef<EventSource | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const atBottomRef = useRef(true)
+
+  const setTabs = useCallback(
+    (next: WorktreeTab[], nextActive?: string | null) => {
+      setTabState(worktreeId, { tabs: next, activeId: nextActive === undefined ? activeId : nextActive })
+    },
+    [worktreeId, activeId],
+  )
+
+  const openTab = useCallback(
+    (tab: Omit<WorktreeTab, 'id'>) => {
+      const created = { ...tab, id: nextTabId() } as WorktreeTab
+      setTabState(worktreeId, { tabs: [...getTabState(worktreeId).tabs, created], activeId: created.id })
+      return created
+    },
+    [worktreeId],
+  )
 
   const applyEvents = useCallback((events: AgentEvent[]) => {
     setEntries((prev) => {
@@ -155,19 +192,11 @@ export default function WorktreePage() {
     [applyEvents],
   )
 
-  // Load the worktree, its repository, and every chat that has run against it.
-  useEffect(() => {
-    if (!id) return
+  const reload = useCallback(() => {
+    if (!worktreeId) return
     setLoadError(null)
-    setWorktree(null)
-    setSession(null)
-    setEntries([])
-    setView({ kind: 'new' })
-    setOpenFiles([])
-    setClosedSessionIds(new Set())
-
     api
-      .getWorktree(id)
+      .getWorktree(worktreeId)
       .then((wt) => {
         setWorktree(wt)
         addTab({ id: wt.id, branch: wt.branch })
@@ -175,35 +204,39 @@ export default function WorktreePage() {
       })
       .catch((e) => setLoadError(String((e as Error).message ?? e)))
 
-    api
-      .listWorktreeSessions(id)
-      .then((list) => {
-        setSessions(list)
-        if (list.length) setView({ kind: 'session', id: list[0].id })
-      })
-      .catch(() => setSessions([]))
-
+    api.listWorktreeSessions(worktreeId).then(setSessions).catch(() => setSessions([]))
     // The attach menu offers this branch's tracked files, so it can only
-    // suggest paths that exist for the agent to read.
-    api.listFiles(id).then(setFiles).catch(() => setFiles([]))
+    // suggest paths that exist for the agent to read. A worktree whose folder
+    // is gone has none, and that's reported by the banner rather than here.
+    api.listFiles(worktreeId).then(setFiles).catch(() => setFiles([]))
+  }, [worktreeId])
+
+  useEffect(() => {
+    reload()
     api.agentCatalog().then(setCatalog).catch(() => setCatalog([]))
     return () => esRef.current?.close()
-  }, [id])
+  }, [reload])
+
+  // A worktree opened for the first time gets one empty tab, so there is
+  // always somewhere to start. Revisiting one keeps whatever was open.
+  useEffect(() => {
+    if (!worktreeId) return
+    const current = getTabState(worktreeId)
+    if (current.tabs.length === 0) {
+      const first: WorktreeTab = { id: nextTabId(), kind: 'draft' }
+      setTabState(worktreeId, { tabs: [first], activeId: first.id })
+    } else if (!current.activeId) {
+      setTabState(worktreeId, { ...current, activeId: current.tabs[0].id })
+    }
+  }, [worktreeId])
 
   // One session, one connection, one source of truth.
   //
   // The events endpoint replays everything already persisted for a session
   // and then tails it live, so the stream alone can render the whole
-  // transcript. The previous version also fetched the timeline in parallel
-  // and opened a second EventSource, which raced: the timeline response
-  // landed after live deltas and overwrote them, and the second connection
-  // closed the first, dropping whatever arrived in between. That is why
-  // messages went missing mid-chat.
-  //
-  // Keyed on the session id alone. Keying on the whole `sessions` array
-  // meant starting any new chat wiped and refetched the chat you were
-  // reading.
-  const activeSessionId = view.kind === 'session' ? view.id : null
+  // transcript. Fetching the timeline in parallel used to race it — the
+  // response landed after live deltas and overwrote them.
+  const activeSessionId = activeTab?.kind === 'session' ? activeTab.sessionId : null
 
   useEffect(() => {
     if (!activeSessionId) {
@@ -217,8 +250,7 @@ export default function WorktreePage() {
     setLoadingTimeline(true)
     connectStream(activeSessionId)
     // Replay arrives immediately after connect; the skeleton is only for
-    // that first frame, so clear it once the connection is established
-    // rather than waiting on a request that no longer exists.
+    // that first frame.
     const t = setTimeout(() => setLoadingTimeline(false), 150)
     return () => clearTimeout(t)
   }, [activeSessionId, connectStream])
@@ -227,13 +259,7 @@ export default function WorktreePage() {
   // choice because it's the only adapter that can hold a conversation, but
   // defaulting to it on a machine without it would offer a chat that can't
   // start.
-  useEffect(() => {
-    if (!catalog.length) return
-    setAgentId((current) => {
-      if (catalog.some((a) => a.id === current && a.available)) return current
-      return catalog.find((a) => a.available)?.id ?? current
-    })
-  }, [catalog])
+  const defaultAgentId = catalog.find((a) => a.available)?.id ?? 'claude'
 
   // Keep the session record (status, agent) in sync without touching the
   // transcript — status changes must never re-run the stream effect.
@@ -253,17 +279,30 @@ export default function WorktreePage() {
     if (el && atBottomRef.current) el.scrollTo({ top: el.scrollHeight })
   }, [entries])
 
+  const activeAgentId =
+    activeTab?.kind === 'session'
+      ? session?.agentDefinitionId ?? defaultAgentId
+      : activeTab
+        ? draftAgents[activeTab.id] ?? defaultAgentId
+        : defaultAgentId
+
+  const prompt = activeTab ? drafts[activeTab.id] ?? '' : ''
+  const setPrompt = (value: string) => {
+    if (activeTab) setDrafts((prev) => ({ ...prev, [activeTab.id]: value }))
+  }
+
   async function submitComposer(e: React.FormEvent) {
     e.preventDefault()
-    if (!prompt.trim() || !id) return
+    if (!prompt.trim() || !worktreeId || !activeTab) return
     setComposerError(null)
+    const text = prompt.trim()
     try {
-      // A session that's mid-conversation (waiting for the next turn, or
-      // blocked on a question) keeps replying in the same tab instead of
-      // spinning up a new chat.
-      const continuing = view.kind === 'session' && (session?.status === 'needs_input' || session?.status === 'waiting')
+      // A chat that's mid-conversation keeps replying in the same tab
+      // instead of spinning up a new one. A chat whose process is gone
+      // (after a restart) still replies here — the server reattaches to the
+      // agent's own stored conversation.
+      const continuing = activeTab.kind === 'session' && session
       if (continuing && session) {
-        const text = prompt.trim()
         const attached = attachments
         setPrompt('')
         setAttachments([])
@@ -271,67 +310,93 @@ export default function WorktreePage() {
         setSession((s) => (s ? { ...s, status: 'running' } : s))
         return
       }
-      // Starting a chat adds to this worktree's list rather than replacing
-      // whatever was open. Model and thinking level are properties of the
-      // chat being started, so they travel with it and stay fixed for its
-      // whole life — the server records both on the session row.
-      const created = await api.createSession(id, {
-        agentDefinitionId: agentId,
+
+      const created = await api.createSession(worktreeId, {
+        agentDefinitionId: activeAgentId,
         model: model || undefined,
         reasoningLevel: effort || undefined,
         permissionMode: permissionMode || undefined,
-        prompt: prompt.trim(),
+        prompt: text,
         attachments,
       })
       setPrompt('')
       setAttachments([])
       setSessions((prev) => [created, ...prev])
       setSession(created)
-      // Switching the view is enough: the stream effect connects, and the
-      // replay carries the prompt back. Connecting here as well is what
-      // produced the duplicate-connection race.
-      setView({ kind: 'session', id: created.id })
+      // The draft tab becomes the chat it just started, in place — opening a
+      // second tab for it would leave an empty draft behind.
+      setTabs(
+        tabs.map((t) => (t.id === activeTab.id ? { id: t.id, kind: 'session', sessionId: created.id } : t)),
+        activeTab.id,
+      )
     } catch (err) {
       setComposerError(String((err as Error).message ?? err))
     }
   }
 
-  // The tab strip isn't chat-only — a file clicked from either FilesPanel
-  // mount opens here too. Re-clicking an already-open file just switches to
-  // its existing tab instead of duplicating it.
+  // Re-clicking an already-open file switches to its tab instead of
+  // duplicating it.
   function openFile(path: string) {
-    setOpenFiles((prev) => (prev.includes(path) ? prev : [...prev, path]))
-    setView({ kind: 'file', path })
+    const existing = tabs.find((t) => t.kind === 'file' && t.path === path)
+    if (existing) {
+      setTabs(tabs, existing.id)
+      return
+    }
+    openTab({ kind: 'file', path })
   }
 
-  function closeFile(path: string) {
-    setOpenFiles((prev) => prev.filter((p) => p !== path))
-    setView((v) => (v.kind === 'file' && v.path === path ? { kind: 'new' } : v))
-  }
-
-  // Closing a chat tab doesn't delete the session (there's no such
-  // endpoint, nor should there be) — it drops out of the open-tabs row into
-  // the History menu, reopenable from there. Closing the active tab falls
-  // back to another still-open session, or 'new' if none are left.
-  function closeSession(sessionId: string) {
-    setClosedSessionIds((prev) => new Set(prev).add(sessionId))
-    setView((v) => {
-      if (!(v.kind === 'session' && v.id === sessionId)) return v
-      const next = sessions.find((s) => s.id !== sessionId && !closedSessionIds.has(s.id))
-      return next ? { kind: 'session', id: next.id } : { kind: 'new' }
-    })
+  // Closing a chat tab doesn't delete the session (there's no such endpoint,
+  // nor should there be) — it drops into the History menu, reopenable there.
+  function closeTab(tabId: string) {
+    const remaining = tabs.filter((t) => t.id !== tabId)
+    const nextActive =
+      activeId === tabId ? (remaining[remaining.length - 1]?.id ?? null) : activeId
+    if (remaining.length === 0) {
+      const fresh: WorktreeTab = { id: nextTabId(), kind: 'draft' }
+      setTabState(worktreeId, { tabs: [fresh], activeId: fresh.id })
+      return
+    }
+    setTabState(worktreeId, { tabs: remaining, activeId: nextActive })
   }
 
   function reopenSession(sessionId: string) {
-    setClosedSessionIds((prev) => {
-      const next = new Set(prev)
-      next.delete(sessionId)
-      return next
-    })
-    setView({ kind: 'session', id: sessionId })
+    const existing = tabs.find((t) => t.kind === 'session' && t.sessionId === sessionId)
+    if (existing) {
+      setTabs(tabs, existing.id)
+      return
+    }
+    openTab({ kind: 'session', sessionId })
   }
 
-  if (loadError) {
+  /** A draft becomes what you picked, in the tab you picked it in. */
+  function chooseDraft(tabId: string, choice: WorktreeTab['kind'], agentId?: string) {
+    if (choice === 'draft') return
+    if (agentId) setDraftAgents((prev) => ({ ...prev, [tabId]: agentId }))
+    if (choice === 'terminal' || choice === 'files') {
+      setTabs(
+        tabs.map((t) => (t.id === tabId ? ({ id: tabId, kind: choice } as WorktreeTab) : t)),
+        tabId,
+      )
+    }
+    // A chat stays a draft until its first message: there is no session to
+    // point at until then.
+  }
+
+  async function restore() {
+    if (!worktree) return
+    setRestoring(true)
+    setLoadError(null)
+    try {
+      setWorktree(await api.restoreWorktree(worktree.id))
+      reload()
+    } catch (e) {
+      setLoadError(String((e as Error).message ?? e))
+    } finally {
+      setRestoring(false)
+    }
+  }
+
+  if (loadError && !worktree) {
     return (
       <AppShell>
         <div className="p-6 max-w-[520px]">
@@ -346,7 +411,7 @@ export default function WorktreePage() {
 
   if (!worktree) return null
 
-  const composerBusy = view.kind === 'session' && session ? RUNNING.has(session.status) : false
+  const composerBusy = activeTab?.kind === 'session' && session ? RUNNING.has(session.status) : false
   const lastEntry = entries[entries.length - 1]
   // Something is already visibly happening when text is streaming in or a
   // tool is mid-run — both say "working" better than a spinner would, so the
@@ -355,13 +420,16 @@ export default function WorktreePage() {
     lastEntry?.type === 'message' && 'role' in lastEntry && (lastEntry as { role: string }).role === 'agent'
   const toolIsRunning = lastEntry?.type === 'tool' && (lastEntry as ToolEntry).output === undefined
   const awaitingReply = composerBusy && !agentIsStreaming && !toolIsRunning
-  const agentName = catalog.find((a) => a.id === (session?.agentDefinitionId ?? agentId))?.name ?? agentId
-  // The open session's own status is fresher than its row in `sessions`,
-  // which is only refetched when the worktree changes — without this the
-  // header would keep saying "running" after a chat went idle.
-  const runningCount = sessions.filter((s) =>
-    RUNNING.has(s.id === session?.id ? session.status : s.status),
-  ).length
+  const agentName = catalog.find((a) => a.id === activeAgentId)?.name ?? activeAgentId
+  // The open chat's own status is fresher than its row in `sessions`, which
+  // is only refetched when the worktree changes — without this the header
+  // would keep saying "running" after a chat went idle.
+  const runningCount = sessions.filter((s) => RUNNING.has(s.id === session?.id ? session.status : s.status)).length
+  const openSessionIds = new Set(tabs.flatMap((t) => (t.kind === 'session' ? [t.sessionId] : [])))
+  const closedSessions = sessions.filter((s) => !openSessionIds.has(s.id))
+  // A chat is "replying" once it exists at all; the server reattaches to a
+  // conversation whose process is gone rather than refusing it.
+  const replying = activeTab?.kind === 'session' && Boolean(session)
 
   return (
     <AppShell
@@ -392,38 +460,67 @@ export default function WorktreePage() {
       statusBar={<StatusBar worktree={worktree} onChange={setWorktree} />}
     >
       <div className="h-full flex flex-col min-h-0 min-w-0">
-        {/* min-w-0: this is a flex-col item with no overflow of its own —
-            without it, SessionTabs' natural content width (many session +
-            file tabs) forces this wrapper wider instead of letting
-            SessionTabs' own overflow-x-auto scroll the tab row in place. */}
         <div className="shrink-0 min-w-0">
           <SessionTabs
+            tabs={tabs}
+            activeId={activeId}
             sessions={sessions}
-            closedSessionIds={closedSessionIds}
-            view={view}
-            onSelect={setView}
             catalog={catalog}
-            onAgentChange={setAgentId}
-            openFiles={openFiles}
-            onCloseFile={closeFile}
-            onCloseSession={closeSession}
+            closedSessions={closedSessions}
+            onSelect={(tabId) => setTabs(tabs, tabId)}
+            onClose={closeTab}
+            onNewTab={() => openTab({ kind: 'draft' })}
             onReopenSession={reopenSession}
           />
         </div>
 
-        {view.kind === 'terminal' ? (
+        {/* The directory can disappear without devpipe involved. Saying so
+            once, at the top, beats every panel failing separately with the
+            same underlying reason. */}
+        {worktree.missing && (
+          <div className="shrink-0 flex items-start gap-2 border-b border-error/30 bg-error/[0.07] px-4 py-2.5">
+            <FolderX size={14} className="text-error shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] text-error">This worktree's folder is missing.</p>
+              <p className="text-[11px] text-text-muted font-mono truncate" title={worktree.path}>
+                {worktree.path}
+              </p>
+              {loadError && <p className="text-[11px] text-error mt-1">{loadError}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={restore}
+              disabled={restoring}
+              className="shrink-0 bg-action-strong text-white px-2.5 py-1 rounded-md text-[12px] disabled:opacity-50"
+            >
+              {restoring ? 'Restoring…' : 'Restore it'}
+            </button>
+          </div>
+        )}
+
+        {activeTab?.kind === 'terminal' ? (
           <div className="flex-1 min-h-0 min-w-0">
             <TerminalPanel worktreeId={worktree.id} branch={worktree.branch} />
           </div>
-        ) : view.kind === 'files' ? (
+        ) : activeTab?.kind === 'files' ? (
           <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
             <div className="mx-auto w-full max-w-[760px] px-6 py-4">
               <FilesPanel worktreeId={worktree.id} onOpenFile={openFile} />
             </div>
           </div>
-        ) : view.kind === 'file' ? (
+        ) : activeTab?.kind === 'file' ? (
           <div className="flex-1 min-h-0 min-w-0">
-            <FileView worktreeId={worktree.id} path={view.path} />
+            <FileView worktreeId={worktree.id} path={activeTab.path} />
+          </div>
+        ) : activeTab?.kind === 'draft' && !draftAgents[activeTab.id] ? (
+          <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
+            <NewTabChooser
+              catalog={catalog}
+              branch={worktree.branch}
+              onChat={(agent) => chooseDraft(activeTab.id, 'session', agent)}
+              onTerminal={() => chooseDraft(activeTab.id, 'terminal')}
+              onFiles={() => chooseDraft(activeTab.id, 'files')}
+            />
           </div>
         ) : (
           <>
@@ -440,20 +537,16 @@ export default function WorktreePage() {
 
                 {!loadingTimeline && entries.length === 0 && (
                   <div>
-                    {view.kind === 'new' ? (
+                    {activeTab?.kind === 'draft' ? (
                       <>
                         <div className="text-center py-12">
-                          <p className="text-text-muted">Start a chat on this branch</p>
+                          <p className="text-text-muted">Chat with {agentName}</p>
                           <p className="text-text-faint text-[12px] mt-1">
-                            {agentName} works in <span className="font-mono">{worktree.branch}</span> only — nothing it
-                            does here touches your other branches.
+                            It works in <span className="font-mono">{worktree.branch}</span> only — nothing it does here
+                            touches your other branches.
                           </p>
                         </div>
-                        <SessionHistory
-                          sessions={sessions}
-                          catalog={catalog}
-                          onOpen={(id) => reopenSession(id)}
-                        />
+                        <SessionHistory sessions={sessions} catalog={catalog} onOpen={reopenSession} />
                       </>
                     ) : (
                       <p className="text-text-faint text-center py-16">Nothing was said in this chat.</p>
@@ -465,8 +558,7 @@ export default function WorktreePage() {
 
                 {/* The agent is silent for several seconds before its first
                     token. Without this the app looks like it swallowed the
-                    message. Hidden once text starts arriving, because the
-                    text itself is then the feedback. */}
+                    message. */}
                 {awaitingReply && (
                   <div className="flex items-center gap-2 text-text-faint">
                     <Loader2 size={12} className="animate-spin" />
@@ -484,8 +576,10 @@ export default function WorktreePage() {
                   onSubmit={submitComposer}
                   textareaRef={composerRef}
                   catalog={catalog}
-                  agentId={agentId}
-                  onAgentChange={setAgentId}
+                  agentId={activeAgentId}
+                  onAgentChange={(next) => {
+                    if (activeTab) setDraftAgents((prev) => ({ ...prev, [activeTab.id]: next }))
+                  }}
                   model={model}
                   onModelChange={setModel}
                   effort={effort}
@@ -497,8 +591,7 @@ export default function WorktreePage() {
                   files={files}
                   repository={repository}
                   busy={composerBusy}
-                  replying={view.kind === 'session' && (session?.status === 'needs_input' || session?.status === 'waiting')}
-                  showAgentSelect={view.kind !== 'new'}
+                  replying={replying}
                   error={composerError}
                 />
               </div>
