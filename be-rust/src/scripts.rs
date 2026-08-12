@@ -21,14 +21,44 @@ pub struct ScriptOutput {
 }
 
 pub async fn run(worktree_path: &Path, script: &str) -> Result<ScriptOutput> {
+    exec(worktree_path, script, None).await
+}
+
+/// Runs one command inside a worktree, optionally in a subdirectory of it.
+///
+/// This backs the terminal tab. Each call is its own `sh -c` — there is no
+/// persistent shell, so shell state (exported variables, an activated
+/// virtualenv) does not survive between commands; the caller tracks the
+/// working directory itself and passes it back as `relative_cwd`. The
+/// terminal UI says so rather than letting people discover it by having
+/// `export` silently do nothing.
+///
+/// `relative_cwd` is confined to the worktree: an absolute path or a `..`
+/// escape is refused, so the terminal can't be walked out of the worktree it
+/// belongs to. That is a containment boundary for *navigation*, not for
+/// execution — the command itself is an unsandboxed shell, same trust model
+/// as the repository's configured scripts and custom agent definitions.
+pub async fn exec(worktree_path: &Path, command: &str, relative_cwd: Option<&str>) -> Result<ScriptOutput> {
     validate_path(worktree_path)?;
-    if script.trim().is_empty() {
-        return Err(DomainError::Invalid("script is empty".into()));
+    if command.trim().is_empty() {
+        return Err(DomainError::Invalid("command is empty".into()));
     }
+
+    let mut cwd = worktree_path.to_path_buf();
+    if let Some(relative) = relative_cwd.filter(|r| !r.is_empty() && *r != ".") {
+        if relative.starts_with('/') || relative.split('/').any(|segment| segment == "..") {
+            return Err(DomainError::Invalid(format!("working directory must be inside the worktree: {relative}")));
+        }
+        cwd = cwd.join(relative);
+        if !cwd.is_dir() {
+            return Err(DomainError::Invalid(format!("no such directory: {relative}")));
+        }
+    }
+
     let output = Command::new("sh")
         .arg("-c")
-        .arg(script)
-        .current_dir(worktree_path)
+        .arg(command)
+        .current_dir(&cwd)
         .output()
         .await
         .map_err(DomainError::Io)?;

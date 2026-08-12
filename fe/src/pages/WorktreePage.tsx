@@ -11,6 +11,7 @@ import { SessionHistory } from '@/components/SessionHistory'
 import { SessionTabs, type MainView } from '@/components/SessionTabs'
 import { SkeletonRows } from '@/components/Skeleton'
 import { StatusBar } from '@/components/StatusBar'
+import { TerminalPanel } from '@/components/TerminalPanel'
 import { Transcript } from '@/components/Transcript'
 import { api } from '@/lib/api'
 import { addTab } from '@/lib/tabs'
@@ -355,9 +356,29 @@ export default function WorktreePage() {
   const toolIsRunning = lastEntry?.type === 'tool' && (lastEntry as ToolEntry).output === undefined
   const awaitingReply = composerBusy && !agentIsStreaming && !toolIsRunning
   const agentName = catalog.find((a) => a.id === (session?.agentDefinitionId ?? agentId))?.name ?? agentId
+  // The open session's own status is fresher than its row in `sessions`,
+  // which is only refetched when the worktree changes — without this the
+  // header would keep saying "running" after a chat went idle.
+  const runningCount = sessions.filter((s) =>
+    RUNNING.has(s.id === session?.id ? session.status : s.status),
+  ).length
 
   return (
     <AppShell
+      topBarLeft={
+        // Counted from the session rows, not from a hopeful local flag — if
+        // it says one is running, one process is running.
+        runningCount > 0 ? (
+          <span className="flex items-center gap-1.5 text-[12px] text-text-muted min-w-0">
+            <span className="size-1.5 rounded-full bg-accent shrink-0 animate-pulse" aria-hidden />
+            <span className="truncate">
+              {runningCount} agent{runningCount === 1 ? '' : 's'} running
+            </span>
+          </span>
+        ) : (
+          <span className="text-[12px] text-text-faint truncate">No agents running</span>
+        )
+      }
       rightPanel={
         <RightPanel
           worktreeId={worktree.id}
@@ -390,7 +411,11 @@ export default function WorktreePage() {
           />
         </div>
 
-        {view.kind === 'files' ? (
+        {view.kind === 'terminal' ? (
+          <div className="flex-1 min-h-0 min-w-0">
+            <TerminalPanel worktreeId={worktree.id} branch={worktree.branch} />
+          </div>
+        ) : view.kind === 'files' ? (
           <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
             <div className="mx-auto w-full max-w-[760px] px-6 py-4">
               <FilesPanel worktreeId={worktree.id} onOpenFile={openFile} />

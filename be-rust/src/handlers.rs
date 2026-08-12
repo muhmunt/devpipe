@@ -29,6 +29,7 @@ pub fn routes() -> Router<crate::state::AppState> {
         .route("/worktrees/:id/files/content", get(read_worktree_file))
         .route("/worktrees/:id/commits", get(list_commits))
         .route("/worktrees/:id/run-script", post(run_script))
+        .route("/worktrees/:id/exec", post(exec_command))
         .route("/agent-definitions", get(list_agent_definitions).post(create_agent_definition))
         .route("/agents/detect", get(detect_agents))
         .route("/agents/catalog", get(agent_catalog))
@@ -800,6 +801,30 @@ async fn run_script(
     let script_text = script_text.ok_or_else(|| AppError::Invalid(format!("no {} script configured for this repository", body.script)))?;
 
     let output = crate::scripts::run(std::path::Path::new(&worktree.path), &script_text).await?;
+    Ok(Json(output))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExecBody {
+    command: String,
+    /// Worktree-relative directory to run in. The terminal tracks this
+    /// itself because each command is a separate `sh -c` with no memory of
+    /// the last one.
+    cwd: Option<String>,
+}
+
+/// Runs one command in the worktree, for the terminal tab. Unsandboxed by
+/// design — the same trust model as this app's configured scripts and the
+/// agents it already launches, all of which run arbitrary code on this
+/// machine.
+async fn exec_command(
+    State(pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<ExecBody>,
+) -> Result<Json<crate::scripts::ScriptOutput>, AppError> {
+    let worktree = fetch_worktree(&pool, id).await?;
+    let output = crate::scripts::exec(std::path::Path::new(&worktree.path), &body.command, body.cwd.as_deref()).await?;
     Ok(Json(output))
 }
 

@@ -95,6 +95,10 @@ export const api = {
   listFiles: (id: string) => request<string[]>(`/worktrees/${id}/files`),
   readFile: (id: string, path: string) =>
     request<{ path: string; content: string }>(`/worktrees/${id}/files/content?path=${encodeURIComponent(path)}`),
+  /** One command in the worktree. `cwd` is worktree-relative; there is no
+      persistent shell, so the caller tracks it. */
+  execCommand: (worktreeId: string, command: string, cwd?: string) =>
+    request<ScriptOutput>(`/worktrees/${worktreeId}/exec`, { method: 'POST', body: JSON.stringify({ command, cwd }) }),
   runScript: (worktreeId: string, script: 'setup' | 'run' | 'test' | 'teardown') =>
     request<ScriptOutput>(`/worktrees/${worktreeId}/run-script`, { method: 'POST', body: JSON.stringify({ script }) }),
 

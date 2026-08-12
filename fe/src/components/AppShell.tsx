@@ -14,11 +14,14 @@ import { useTier } from '@/lib/breakpoint'
 // drawer under 1024, and under 768 it stops pretending three panes fit and
 // says so.
 export function AppShell({
+  topBarLeft,
   topBarRight,
   rightPanel,
   statusBar,
   children,
 }: {
+  /** Sits beside the sidebar toggle — what the app is doing right now. */
+  topBarLeft?: ReactNode
   topBarRight?: ReactNode
   rightPanel?: ReactNode
   statusBar?: ReactNode
@@ -96,17 +99,20 @@ export function AppShell({
         {/* min-h-0 / min-w-0: without them this track takes its content's
             natural size (long transcripts, wide diffs) and pushes the page
             past the viewport instead of clipping at main. */}
-        <div className="grid grid-rows-[36px_auto_1fr] min-w-0 min-h-0">
+        <div className="grid grid-rows-[40px_auto_1fr] min-w-0 min-h-0">
           <div className="chrome flex items-center justify-between gap-2 border-b border-border px-3">
-            <button
-              type="button"
-              onClick={toggleNav}
-              className="text-text-muted hover:text-text active:translate-y-px transition-colors"
-              aria-label={navHidden ? 'Show projects' : 'Hide projects'}
-              aria-expanded={!navHidden}
-            >
-              {navHidden ? <PanelLeft size={15} /> : <PanelLeftClose size={15} />}
-            </button>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <button
+                type="button"
+                onClick={toggleNav}
+                className="shrink-0 text-text-muted hover:text-text active:translate-y-px transition-colors"
+                aria-label={navHidden ? 'Show projects' : 'Hide projects'}
+                aria-expanded={!navHidden}
+              >
+                {navHidden ? <PanelLeft size={15} /> : <PanelLeftClose size={15} />}
+              </button>
+              {topBarLeft}
+            </div>
             <div className="flex items-center gap-2 min-w-0">
               {topBarRight}
               {rightPanel && panelIsOverlay && (
