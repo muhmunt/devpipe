@@ -3,7 +3,15 @@ import { useEffect, useState } from 'react'
 import { AppShell } from '@/components/AppShell'
 import { SkeletonRows } from '@/components/Skeleton'
 import { api } from '@/lib/api'
-import { getThemePreference, setThemePreference, type ThemePreference } from '@/lib/theme'
+import {
+  ACCENT_PRESETS,
+  getAccentPreference,
+  getThemePreference,
+  setAccentPreference,
+  setThemePreference,
+  type AccentId,
+  type ThemePreference,
+} from '@/lib/theme'
 import type { EditorAvailability } from '@/lib/types'
 
 const THEMES: ThemePreference[] = ['dark', 'light', 'system']
@@ -11,6 +19,7 @@ const THEMES: ThemePreference[] = ['dark', 'light', 'system']
 /** Every row reflects real detected state; nothing is listed that isn't checked. */
 export default function SettingsPage() {
   const [theme, setTheme] = useState<ThemePreference>(getThemePreference())
+  const [accent, setAccent] = useState<AccentId>(getAccentPreference())
   const [agents, setAgents] = useState<Record<string, boolean> | null>(null)
   const [editors, setEditors] = useState<EditorAvailability | null>(null)
 
@@ -22,6 +31,11 @@ export default function SettingsPage() {
   function pickTheme(t: ThemePreference) {
     setTheme(t)
     setThemePreference(t)
+  }
+
+  function pickAccent(id: AccentId) {
+    setAccent(id)
+    setAccentPreference(id)
   }
 
   return (
@@ -48,6 +62,26 @@ export default function SettingsPage() {
                   >
                     {t}
                   </button>
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-[12px] text-text-muted mb-2">Accent color</h2>
+              <div className="flex items-center gap-3">
+                {ACCENT_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => pickAccent(p.id)}
+                    aria-pressed={accent === p.id}
+                    aria-label={p.label}
+                    title={p.label}
+                    className={`size-7 rounded-full transition-shadow focus-visible:outline-none ${
+                      accent === p.id ? 'ring-2 ring-offset-2 ring-offset-background ring-accent' : 'hover:opacity-80'
+                    }`}
+                    style={{ backgroundColor: p.swatch }}
+                  />
                 ))}
               </div>
             </section>
